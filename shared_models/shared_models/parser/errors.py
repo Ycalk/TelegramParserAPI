@@ -29,3 +29,8 @@ class CannotGetChannelInfo(Exception):
     
     def __str__(self):
         return f"Cannot get channel info for {self.url}"
+
+
+class SessionPasswordNeeded(Exception):
+    def __str__(self):
+        return "2fa password provided. Add 2FA.txt file to archive"

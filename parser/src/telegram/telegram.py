@@ -22,19 +22,23 @@ class Telegram:
         self.__client: Optional[Client] = None
     
     async def init_database(self) -> None:
+        self.logger.info("Initializing database")
         await Tortoise.init(config=TORTOISE_ORM)
         await Tortoise.generate_schemas()
+        self.logger.info("Database initialized")
     
     async def initialize(self) -> None:
         if self.__initialized:
             return
         
+        self.logger.info("Getting client")
         self.__client = await Client.filter(working=True).order_by("users_count", "id").first()
         if self.__client is None:
             raise ValueError("No active clients found")
         self.__client.users_count += 1
         await self.__client.save()
         
+        self.logger.info("Creating session")
         tdata_path = os.path.join(Config.TDATA_PATH, str(self.__client.id), "tdata")
         api = API.TelegramDesktop(
             api_id=self.__client.api_id,

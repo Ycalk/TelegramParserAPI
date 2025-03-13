@@ -4,19 +4,30 @@ from arq.connections import RedisSettings
 import os
 from arq.logs import default_log_config
 import logging
+from src.parser import Parser
+from src.telegram import Telegram
 from concurrent.futures import ProcessPoolExecutor
 from dotenv import load_dotenv
+import asyncio
 load_dotenv()
 
 
 REDIS_SETTINGS = RedisSettings(os.getenv('REDIS_HOST', 'localhost'), int(os.getenv('REDIS_PORT', '6379')))
-FUNCTIONS = []
+FUNCTIONS = [Parser.get_channel_info, Telegram.add_client]
 
 async def startup(ctx):
+    telegram = Telegram()
+    await telegram.init_database()
+    
+    parser = Parser(telegram)
+    ctx['Parser_instance'] = parser
+    ctx['Telegram_instance'] = telegram
     logging.getLogger('arq').info('Startup done')
+    
 
 async def shutdown(ctx):
     logging.getLogger('arq').info('Shutting down...')
+    ctx['Telegram_instance'].close()
 
 def start_worker():
     verbose = True
@@ -31,7 +42,8 @@ def start_worker():
                     on_startup = startup,
                     on_shutdown = shutdown,
                     redis_settings = REDIS_SETTINGS,
-                    job_timeout=100)
+                    job_timeout=100,
+                    max_jobs=int(os.getenv('MAX_JOBS', '10')))
     worker.run()
 
 def main(max_workers: int):

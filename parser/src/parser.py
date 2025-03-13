@@ -7,7 +7,7 @@ from telethon.tl.functions.channels import GetFullChannelRequest
 from telethon.tl.types.messages import ChatFull
 from telethon.tl import types
 from shared_models.parser.get_channel_info import GetChannelInfoRequest, GetChannelInfoResponse
-from telegram.telegram import Telegram
+from .telegram.telegram import Telegram
 from telethon.errors.rpcerrorlist import UserAlreadyParticipantError, InviteRequestSentError, InviteHashExpiredError, AuthKeyDuplicatedError, UserDeactivatedBanError, FloodWaitError
 from shared_models.parser.errors import FloodWait, InvalidChannelLink, UserBan, CannotGetChannelInfo
 from telethon.tl.functions.messages import ImportChatInviteRequest

@@ -74,15 +74,13 @@ class Parser:
         end_date = start_date - timedelta(hours=24)
         
         views = 0
-        
         async for post in client.iter_messages(entity, offset_date=start_date):
             post: types.Message
-            
             post_date = post.date.replace(tzinfo=UTC) if post.date.tzinfo is None else post.date # type: ignore
-            
             if post_date.timestamp() < end_date.timestamp(): # type: ignore
                 break
             views += post.views or 0
+            
         return views
     
     # Methods

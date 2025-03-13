@@ -1,24 +1,31 @@
+import logging
 import os
 from telethon import TelegramClient
 from tortoise import Tortoise
-from ..config import Config, TORTOISE_ORM
+from ..config import Config, TORTOISE_ORM, TelegramClientConfig
 from .models import Client
 from telegram.opentele.src.td import TDesktop
 from telegram.opentele.src.api import API
 import uuid
-from typing import Optional
+from typing import Optional, final
+from telethon.errors import SessionPasswordNeededError
+from shared_models.parser.errors import SessionPasswordNeeded
+import zipfile
+
 
 class Telegram:
     def __init__(self) -> None:
         self.__initialized = False
+        self.logger = logging.getLogger("telegram")
         self.__session_path = os.path.join(Config.SESSION_DIR, f"{uuid.uuid4()}.session")
         self.__telegram_client: Optional[TelegramClient] = None
         self.__client: Optional[Client] = None
     
-    async def __initialize(self) -> None:
+    async def init_database(self) -> None:
         await Tortoise.init(config=TORTOISE_ORM)
         await Tortoise.generate_schemas()
-        
+    
+    async def initialize(self) -> None:
         if self.__initialized:
             return
         
@@ -45,11 +52,16 @@ class Telegram:
         password = None
         if os.path.exists(pass_path):
             password = open(pass_path).read().strip()
-            
-        self.__telegram_client = await tdesk.ToTelethon(self.__session_path, api, password=password) # type: ignore
+        
+        try:
+            self.__telegram_client = await tdesk.ToTelethon(self.__session_path, api, password=password) # type: ignore
+        except SessionPasswordNeededError as e:
+            self.__client.working = False
+            await self.__client.save()
+            raise SessionPasswordNeeded()
         
     async def get_client(self) -> TelegramClient:
-        await self.__initialize()
+        await self.initialize()
         if self.__telegram_client is None:
             raise ValueError("Client is None")
         return self.__telegram_client
@@ -57,8 +69,40 @@ class Telegram:
     async def close(self) -> None:
         if self.__telegram_client is not None:
             await self.__telegram_client.disconnect() # type: ignore
-        self.__telegram_client = None
+            self.__telegram_client = None
         if os.path.exists(self.__session_path):
             os.remove(self.__session_path)
+        if self.__client is not None:
+            self.__client.users_count -= 1
+            await self.__client.save()
         self.__initialized = False
         await Tortoise.close_connections()
+    
+    
+    # Methods
+    @staticmethod
+    async def add_client(ctx, tdata: bytes) -> None:
+        self: Telegram = ctx['Telegram_instance']
+        self.logger.info('Adding client')
+        new_client = Client(
+            api_id=TelegramClientConfig.API_ID,
+            api_hash=TelegramClientConfig.API_HASH,
+            device_model=TelegramClientConfig.DEVICE_MODEL,
+            system_version=TelegramClientConfig.SYSTEM_VERSION,
+            app_version=TelegramClientConfig.APP_VERSION,
+            lang_code=TelegramClientConfig.LANG_CODE,
+            system_lang_code=TelegramClientConfig.SYSTEM_LANG_CODE,
+            lang_pack=TelegramClientConfig.LANG_PACK,
+            working=False
+        )
+        await new_client.save()
+        target_directory = os.path.join(Config.TDATA_PATH, str(new_client.id))
+        os.makedirs(target_directory, exist_ok=True)
+        
+        with zipfile.ZipFile(tdata) as z: # type: ignore
+            z.extractall(target_directory)
+        if not os.path.exists(os.path.join(target_directory, "tdata")):
+            raise zipfile.BadZipFile("tdata directory not found")
+        
+        new_client.working = True
+        await new_client.save()

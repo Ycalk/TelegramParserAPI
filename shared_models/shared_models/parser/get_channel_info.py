@@ -1,5 +1,5 @@
 from pydantic import BaseModel, model_validator, ValidationError
-from .channel_info import ChannelInfo
+from ..channel import Channel
 from typing_extensions import Self, Optional
 
 
@@ -14,4 +14,4 @@ class GetChannelInfoRequest(BaseModel):
         return self
     
 class GetChannelInfoResponse(BaseModel):
-    channel: ChannelInfo
+    channel: Channel

@@ -11,6 +11,7 @@ from typing import Optional, final
 from telethon.errors import SessionPasswordNeededError
 from shared_models.parser.errors import SessionPasswordNeeded
 import zipfile
+import io
 
 
 class Telegram:
@@ -102,9 +103,9 @@ class Telegram:
         await new_client.save()
         target_directory = os.path.join(Config.TDATA_PATH, str(new_client.id))
         os.makedirs(target_directory, exist_ok=True)
-        
-        with zipfile.ZipFile(tdata) as z: # type: ignore
-            z.extractall(target_directory)
+        with io.BytesIO(tdata) as zip_buffer:
+            with zipfile.ZipFile(zip_buffer) as z:
+                z.extractall(target_directory)
         if not os.path.exists(os.path.join(target_directory, "tdata")):
             raise zipfile.BadZipFile("tdata directory not found")
         

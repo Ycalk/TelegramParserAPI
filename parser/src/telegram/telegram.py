@@ -1,5 +1,6 @@
 import logging
 import os
+from telethon.sessions import MemorySession
 from telethon import TelegramClient
 from tortoise import Tortoise
 from ..config import Config, TORTOISE_ORM, TelegramClientConfig
@@ -12,13 +13,13 @@ from telethon.errors import SessionPasswordNeededError
 from shared_models.parser.errors import SessionPasswordNeeded
 import zipfile
 import io
+from tortoise.expressions import F
 
 
 class Telegram:
     def __init__(self) -> None:
         self.__initialized = False
         self.logger = logging.getLogger("telegram")
-        self.__session_path = os.path.join(Config.SESSION_DIR, f"{uuid.uuid4()}.session")
         self.__telegram_client: Optional[TelegramClient] = None
         self.__client: Optional[Client] = None
     
@@ -36,8 +37,7 @@ class Telegram:
         self.__client = await Client.filter(working=True).order_by("users_count", "id").first()
         if self.__client is None:
             raise ValueError("No active clients found")
-        self.__client.users_count += 1
-        await self.__client.save()
+        await Client.filter(id=self.__client.id).update(users_count=F('users_count') + 1)
         
         self.logger.info("Creating session")
         tdata_path = os.path.join(Config.TDATA_PATH, str(self.__client.id), "tdata")
@@ -59,7 +59,7 @@ class Telegram:
             password = open(pass_path).read().strip()
         
         try:
-            self.__telegram_client = await tdesk.ToTelethon(self.__session_path, api, password=password) # type: ignore
+            self.__telegram_client = await tdesk.ToTelethon(session=MemorySession(), api=api, password=password) # type: ignore
         except SessionPasswordNeededError as e:
             self.__client.working = False
             await self.__client.save()
@@ -75,11 +75,8 @@ class Telegram:
         if self.__telegram_client is not None:
             await self.__telegram_client.disconnect() # type: ignore
             self.__telegram_client = None
-        if os.path.exists(self.__session_path):
-            os.remove(self.__session_path)
         if self.__client is not None:
-            self.__client.users_count -= 1
-            await self.__client.save()
+            await Client.filter(id=self.__client.id).update(users_count=F('users_count') - 1)
         self.__initialized = False
         await Tortoise.close_connections()
     

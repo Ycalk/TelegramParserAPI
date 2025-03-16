@@ -18,18 +18,18 @@ FUNCTIONS = [Parser.get_channel_info, Telegram.add_client]
 async def startup(ctx):
     telegram = Telegram()
     await telegram.init_database()
-    
+    await telegram.initialize()
     parser = Parser(telegram)
     ctx['Parser_instance'] = parser
     ctx['Telegram_instance'] = telegram
-    logging.getLogger('arq').info('Startup done')
+    logging.getLogger('arq').info(f'Startup done {ctx["worker_id"]} / {ctx["workers_count"]}')
     
 
 async def shutdown(ctx):
     logging.getLogger('arq').info('Shutting down...')
-    ctx['Telegram_instance'].close()
+    await ctx['Telegram_instance'].close()
 
-def start_worker():
+def start_worker(worker_id: int, workers_count: int):
     verbose = True
     log_level = 'DEBUG' if verbose else 'INFO'
     logging_config = default_log_config(verbose=verbose)
@@ -44,12 +44,14 @@ def start_worker():
                     redis_settings = REDIS_SETTINGS,
                     job_timeout=100,
                     max_jobs=int(os.getenv('MAX_JOBS', '10')))
+    worker.ctx['worker_id'] = worker_id
+    worker.ctx['workers_count'] = workers_count
     worker.run()
 
 def main(max_workers: int):
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
-        for _ in range(max_workers):
-            executor.submit(start_worker)
+        for i in range(max_workers):
+            executor.submit(start_worker, i + 1, max_workers)
 
 
 if __name__ == '__main__':

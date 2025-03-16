@@ -1,5 +1,5 @@
 from tortoise import fields, models
-from datetime import datetime
+
 
 class Channel(models.Model):
     id = fields.IntField(pk=True, generated=False)

@@ -1,10 +1,13 @@
 import logging
-from os import link
 from tortoise import Tortoise
 from .config import TORTOISE_ORM
 from shared_models import Channel as ChannelSharedModel
 from shared_models.database.update_or_create_channel import UpdateOrCreateChannelResponse
+from shared_models.database.get_channel import GetChannelRequest
+from shared_models.database.errors import ChannelDoesNotExistError, StatsDoesNotExistError
+from shared_models.database.get_channels_ids import GetChannelsIdsResponse
 from .models import Channel, ChannelStatistics
+from tortoise.exceptions import DoesNotExist
 
 
 class Database:
@@ -43,3 +46,32 @@ class Database:
         )
         
         return UpdateOrCreateChannelResponse(record_created=created)
+    
+    @staticmethod
+    async def get_channel(ctx, request: GetChannelRequest) -> ChannelSharedModel:
+        self: Database = ctx['Database_instance']
+        try:
+            channel = await Channel.get(id=request.channel_id)
+        except DoesNotExist:
+            self.logging.error(f"Channel with id {request.channel_id} does not exist")
+            raise ChannelDoesNotExistError(request.channel_id)
+        
+        statistics = await ChannelStatistics.filter(channel=channel).order_by("-recorded_at").first()
+        
+        if statistics is None:
+            self.logging.error(f"Statistics for channel with id {request.channel_id} do not exist")
+            raise StatsDoesNotExistError(request.channel_id)
+        
+        return ChannelSharedModel(
+            channel_id=channel.id,
+            link=channel.link,
+            name=channel.name,
+            description=channel.description,
+            channel_photo_id=channel.logo_id,
+            subscribers=statistics.subscribers,
+            views=statistics.views_24h
+        )
+    
+    async def get_channels_ids(self) -> GetChannelsIdsResponse:
+        ids = await Channel.all().values_list("id", flat=True)
+        return GetChannelsIdsResponse(channel_ids=ids) # type: ignore

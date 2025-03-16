@@ -4,7 +4,7 @@ from telethon.sessions import MemorySession
 from telethon import TelegramClient
 from tortoise import Tortoise
 from ..config import Config, TORTOISE_ORM, TelegramClientConfig
-from .models import Client
+from .models import Client, TelegramCredentials
 from telegram.opentele.src.td import TDesktop
 from telegram.opentele.src.api import API
 import uuid
@@ -36,20 +36,22 @@ class Telegram:
         self.logger.info("Getting client")
         self.__client = await Client.filter(working=True).order_by("users_count", "id").first()
         if self.__client is None:
-            raise ValueError("No active clients found")
+            self.logger.error("No working clients found")
+            return 
         await Client.filter(id=self.__client.id).update(users_count=F('users_count') + 1)
+        telegram_credentials: TelegramCredentials = await self.__client.telegram_credentials
         
         self.logger.info("Creating session")
         tdata_path = os.path.join(Config.TDATA_PATH, str(self.__client.id), "tdata")
         api = API.TelegramDesktop(
-            api_id=self.__client.api_id,
-            api_hash=self.__client.api_hash,
-            device_model=self.__client.device_model,
-            system_version=self.__client.system_version,
-            app_version=self.__client.app_version,
-            lang_code=self.__client.lang_code,
-            system_lang_code=self.__client.system_lang_code,
-            lang_pack=self.__client.lang_pack,
+            api_id=telegram_credentials.api_id,
+            api_hash=telegram_credentials.api_hash,
+            device_model=telegram_credentials.device_model,
+            system_version=telegram_credentials.system_version,
+            app_version=telegram_credentials.app_version,
+            lang_code=telegram_credentials.lang_code,
+            system_lang_code=telegram_credentials.system_lang_code,
+            lang_pack=telegram_credentials.lang_pack,
         )
         tdesk = TDesktop(tdata_path, api)
         
@@ -86,7 +88,8 @@ class Telegram:
     async def add_client(ctx, tdata: bytes) -> None:
         self: Telegram = ctx['Telegram_instance']
         self.logger.info('Adding client')
-        new_client = Client(
+        
+        telegram_credentials, _ = await TelegramCredentials.get_or_create(
             api_id=TelegramClientConfig.API_ID,
             api_hash=TelegramClientConfig.API_HASH,
             device_model=TelegramClientConfig.DEVICE_MODEL,
@@ -95,6 +98,10 @@ class Telegram:
             lang_code=TelegramClientConfig.LANG_CODE,
             system_lang_code=TelegramClientConfig.SYSTEM_LANG_CODE,
             lang_pack=TelegramClientConfig.LANG_PACK,
+        )
+        
+        new_client = await Client.create(
+            telegram_credentials=telegram_credentials,
             working=False
         )
         await new_client.save()

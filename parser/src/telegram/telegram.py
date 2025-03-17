@@ -5,8 +5,8 @@ from telethon import TelegramClient
 from tortoise import Tortoise
 from ..config import Config, TORTOISE_ORM, TelegramClientConfig
 from .models import Client, TelegramCredentials
-from telegram.opentele.src.td import TDesktop
-from telegram.opentele.src.api import API
+from ...telegram.opentele.src.td import TDesktop
+from ...telegram.opentele.src.api import API
 from typing import Optional
 from telethon.errors import SessionPasswordNeededError
 from shared_models.parser.errors import SessionPasswordNeeded
@@ -61,6 +61,7 @@ class Telegram:
         
         try:
             self.__telegram_client = await tdesk.ToTelethon(session=MemorySession(), api=api, password=password) # type: ignore
+            self.__initialized = True
         except SessionPasswordNeededError as e:
             self.__client.working = False
             await self.__client.save()

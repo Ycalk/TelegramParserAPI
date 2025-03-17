@@ -3,7 +3,7 @@ from tortoise import Tortoise
 from .config import TORTOISE_ORM
 from shared_models import Channel as ChannelSharedModel
 from shared_models.database.update_or_create_channel import UpdateOrCreateChannelResponse
-from shared_models.database.get_channel import GetChannelRequest
+from shared_models.database.get_channel import GetChannelRequest, GetChannelResponse
 from shared_models.database.errors import ChannelDoesNotExistError, StatsDoesNotExistError
 from shared_models.database.get_channels_ids import GetChannelsIdsResponse
 from shared_models.database.get_24h_statistics import Get24hStatisticsRequest, Get24hStatisticsResponse, StatisticsSorting, StatisticsItem
@@ -49,7 +49,7 @@ class Database:
         return UpdateOrCreateChannelResponse(record_created=created)
     
     @staticmethod
-    async def get_channel(ctx, request: GetChannelRequest) -> ChannelSharedModel:
+    async def get_channel(ctx, request: GetChannelRequest) -> GetChannelResponse:
         self: Database = ctx['Database_instance']
         try:
             channel = await Channel.get(id=request.channel_id)
@@ -63,7 +63,7 @@ class Database:
             self.logging.error(f"Statistics for channel with id {request.channel_id} do not exist")
             raise StatsDoesNotExistError(request.channel_id)
         
-        return ChannelSharedModel(
+        channel_response = ChannelSharedModel(
             channel_id=channel.id,
             link=channel.link,
             name=channel.name,
@@ -72,6 +72,8 @@ class Database:
             subscribers=statistics.subscribers,
             views=statistics.views_24h
         )
+        
+        return GetChannelResponse(last_update=int(statistics.recorded_at.timestamp()), channel=channel_response)
     
     @staticmethod
     async def get_channels_ids(ctx) -> GetChannelsIdsResponse:

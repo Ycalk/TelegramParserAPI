@@ -1,7 +1,7 @@
 from app.config import ApiServiceConfig
 from fastapi import APIRouter, HTTPException
 import app.services as services
-from shared_models.database.get_channel import GetChannelRequest
+from shared_models.database.get_channel import GetChannelRequest, GetChannelResponse
 from shared_models.database.get_channels_ids import GetChannelsIdsResponse
 from shared_models.database.get_24h_statistics import Get24hStatisticsRequest, Get24hStatisticsResponse
 from shared_models import Channel as ChannelModel
@@ -12,7 +12,7 @@ database_service = services.Database()
 router = APIRouter(prefix="/public", tags=["Public"])
 
 
-@router.get("/get_channel", responses=ApiServiceConfig.DEFAULT_RESPONSE, response_model=ChannelModel)
+@router.get("/get_channel", responses=ApiServiceConfig.DEFAULT_RESPONSE, response_model=GetChannelResponse)
 async def add_client(request: GetChannelRequest = Depends()):
     try:
         return await database_service.get_channel(request)

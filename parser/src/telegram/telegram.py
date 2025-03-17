@@ -7,8 +7,7 @@ from ..config import Config, TORTOISE_ORM, TelegramClientConfig
 from .models import Client, TelegramCredentials
 from telegram.opentele.src.td import TDesktop
 from telegram.opentele.src.api import API
-import uuid
-from typing import Optional, final
+from typing import Optional
 from telethon.errors import SessionPasswordNeededError
 from shared_models.parser.errors import SessionPasswordNeeded
 import zipfile

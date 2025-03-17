@@ -11,7 +11,7 @@ from .telegram.telegram import Telegram
 from telethon.errors.rpcerrorlist import UserAlreadyParticipantError, InviteRequestSentError, InviteHashExpiredError, AuthKeyDuplicatedError, UserDeactivatedBanError, FloodWaitError
 from shared_models.parser.errors import FloodWait, InvalidChannelLink, UserBan, CannotGetChannelInfo
 from telethon.tl.functions.messages import ImportChatInviteRequest
-from shared_models.parser.channel_info import ChannelInfo
+from shared_models import Channel as ChannelInfo
 
 
 class Parser:

@@ -7,7 +7,6 @@ from arq.logs import default_log_config
 import logging
 from concurrent.futures import ProcessPoolExecutor
 from dotenv import load_dotenv
-import asyncio
 load_dotenv()
 
 
@@ -35,6 +34,7 @@ def start_worker(worker_id: int, workers_count: int):
     worker = Worker(functions = FUNCTIONS,
                     on_startup = startup,
                     on_shutdown = shutdown,
+                    queue_name = os.getenv('DATABASE_QUEUE_NAME', 'database'),
                     redis_settings = REDIS_SETTINGS,
                     job_timeout=100,
                     max_jobs=int(os.getenv('MAX_JOBS', '10')))

@@ -71,7 +71,7 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - MAX_JOBS=100
-      - MYSQL_URL=mysql://channels:channels_password@127.0.0.1:3306/channels_db
+      - MYSQL_URL=mysql://channels:channels_password@mysql:3306/channels_db
       - WORKERS_COUNT=1
       - DATABASE_QUEUE_NAME=database
   
@@ -90,7 +90,7 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - MAX_JOBS=5
-      - MYSQL_URL=mysql://telegram:telegram_password@127.0.0.1:3306/telegram_db
+      - MYSQL_URL=mysql://telegram:telegram_password@mysql:3306/telegram_db
       - WORKERS_COUNT=2
       - PARSER_QUEUE_NAME=parser
       - TELEGRAM_QUEUE_NAME=telegram

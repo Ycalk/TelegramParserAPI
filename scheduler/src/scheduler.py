@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from .allocator import Allocator
+from shared_models.database.get_channel import GetChannelRequest, GetChannelResponse
 from arq.connections import RedisSettings
 from shared_models.parser.get_channel_info import GetChannelInfoRequest, GetChannelInfoResponse
 from shared_models.scheduler.add_channel import AddChannelRequest
@@ -41,7 +42,6 @@ class Scheduler:
     @staticmethod
     async def run_iteration(ctx):
         self: Scheduler = ctx['Scheduler_instance']
-        
         if not self.parser_redis or not self.database_redis:
             await self.init()
         
@@ -51,7 +51,14 @@ class Scheduler:
             self.logger.info("No channels to update")
             return
         
-        jobs = [self.get_channel(channel_id=channel_id) for channel_id in update_channels]
+        jobs = []
+        
+        for channel_id in update_channels:
+            task: Optional[Job] = await self.database_redis.enqueue_job('Database.get_channel', GetChannelRequest(channel_id=channel_id)) # type: ignore
+            if task is None:
+                raise ValueError("Task was not created")
+            channel: GetChannelResponse = await task.result()
+            jobs.append(self.get_channel(channel_link=channel.channel.link))
         
         results = await asyncio.gather(*jobs, return_exceptions=True)
 
@@ -67,7 +74,6 @@ class Scheduler:
     @staticmethod
     async def add_channel(ctx, request: AddChannelRequest) -> Channel:
         self: Scheduler = ctx['Scheduler_instance']
-        
         if not self.parser_redis or not self.database_redis:
             await self.init()
             

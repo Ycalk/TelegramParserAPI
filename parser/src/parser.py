@@ -74,7 +74,7 @@ class Parser:
             description=channel_info.full_chat.about,
             subscribers=channel_info.full_chat.participants_count, # type: ignore
             views=await self.__get_posts_views(client, entity),
-            chat_photo_id=str(entity.photo.photo_id) if entity.photo else None # type: ignore
+            channel_photo_id=str(entity.photo.photo_id) if entity.photo else None # type: ignore
         )
     
     async def __get_posts_views(self, client: TelegramClient, entity: types.Channel) -> int:
@@ -96,10 +96,11 @@ class Parser:
     async def get_channel_info(ctx, request: GetChannelInfoRequest) -> GetChannelInfoResponse:
         self: Parser = ctx['Parser_instance']
         client = await self.telegram.get_client()
-        channel_entity = request.channel_link if request.channel_link else request.channel_id
+        if request.channel_link is None:
+            raise ValueError("Supported only getting channel by its link")
         
         async with client:
-            entity = await self.get_channel_entity(client, channel_entity)
+            entity = await self.get_channel_entity(client, request.channel_link)
             return GetChannelInfoResponse(
                 channel=await self.get_channel(client, entity, request.channel_link)
             )

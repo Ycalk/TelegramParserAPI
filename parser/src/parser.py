@@ -90,7 +90,7 @@ class Parser:
         client = await self.telegram.get_client()
 
         async with client:
-            entity = await self.get_channel_entity(client, request['channel_link']) # type: ignore
+            entity = await self.get_channel_entity(client, request.channel_link) # type: ignore
             return GetChannelInfoResponse(
-                channel=await self.get_channel(client, entity, request['channel_link']) # type: ignore
+                channel=await self.get_channel(client, entity, request.channel_link) # type: ignore
             )

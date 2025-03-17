@@ -12,6 +12,7 @@ from telethon.errors.rpcerrorlist import UserAlreadyParticipantError, InviteRequ
 from shared_models.parser.errors import FloodWait, InvalidChannelLink, UserBan, CannotGetChannelInfo
 from telethon.tl.functions.messages import ImportChatInviteRequest
 from shared_models import Channel as ChannelInfo
+from typing import Optional
 
 
 class Parser:
@@ -19,20 +20,20 @@ class Parser:
         self.logger = logging.getLogger('parser')
         self.telegram = telegram
     
-    async def get_channel_entity(self, activated_client: TelegramClient,  url: str) -> types.Channel:
+    async def get_channel_entity(self, activated_client: TelegramClient, entity) -> types.Channel:
         try:
-            channel_entity = await activated_client.get_entity(url)
+            channel_entity = await activated_client.get_entity(entity)
         except ValueError:
             try:
-                channel_entity = await self.join_private_channel(activated_client, url)
+                channel_entity = await self.join_private_channel(activated_client, entity)
             except InviteHashExpiredError as e:
-                raise InvalidChannelLink(url, str(e))
+                raise InvalidChannelLink(entity, str(e))
             except FloodWaitError as e:
                 raise FloodWait(e.seconds)
             except UserDeactivatedBanError as e:
                 raise UserBan(str(e))
         if not channel_entity:
-            raise CannotGetChannelInfo(url)
+            raise CannotGetChannelInfo(entity)
         return channel_entity # type: ignore
     
     async def join_private_channel(self, activated_client: TelegramClient, url: str):
@@ -57,11 +58,18 @@ class Parser:
                     continue
         return await activated_client.get_entity(url)
     
-    async def get_channel(self, client, entity: types.Channel, url: str) -> ChannelInfo:
+    async def get_channel(self, client, entity: types.Channel, url: Optional[str]) -> ChannelInfo:
         channel_info : ChatFull = await client(GetFullChannelRequest(channel=entity)) # type: ignore
+        if url:
+            link = url
+        elif entity.username:
+            link = f"https://t.me/{entity.username}"
+        else:
+            link = f"https://t.me/c/{entity.id}/{1}"
+        
         return ChannelInfo(
             channel_id=channel_info.full_chat.id,
-            link=url,
+            link=link,
             name=entity.title,
             description=channel_info.full_chat.about,
             subscribers=channel_info.full_chat.participants_count, # type: ignore
@@ -88,9 +96,10 @@ class Parser:
     async def get_channel_info(ctx, request: GetChannelInfoRequest) -> GetChannelInfoResponse:
         self: Parser = ctx['Parser_instance']
         client = await self.telegram.get_client()
-
+        channel_entity = request.channel_link if request.channel_link else request.channel_id
+        
         async with client:
-            entity = await self.get_channel_entity(client, request.channel_link) # type: ignore
+            entity = await self.get_channel_entity(client, channel_entity)
             return GetChannelInfoResponse(
-                channel=await self.get_channel(client, entity, request.channel_link) # type: ignore
+                channel=await self.get_channel(client, entity, request.channel_link)
             )

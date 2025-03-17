@@ -1,6 +1,8 @@
 import os
 import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from telegram.opentele.src.td import TDesktop
+from telegram.opentele.src.api import API
 import logging.config
 from arq import Worker
 from arq.connections import RedisSettings

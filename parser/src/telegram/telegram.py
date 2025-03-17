@@ -1,14 +1,12 @@
 import logging
 import os
-import sys
-sys.path.append(".")
 from telethon.sessions import MemorySession
 from telethon import TelegramClient
 from tortoise import Tortoise
 from ..config import Config, TORTOISE_ORM, TelegramClientConfig
 from .models import Client, TelegramCredentials
-from telegram.opentele.src.td import TDesktop
-from telegram.opentele.src.api import API
+from opentele.td import TDesktop
+from opentele.api import API
 from typing import Optional
 from telethon.errors import SessionPasswordNeededError
 from shared_models.parser.errors import SessionPasswordNeeded

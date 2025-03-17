@@ -1,8 +1,4 @@
 import os
-import sys
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from telegram.opentele.src.td import TDesktop
-from telegram.opentele.src.api import API
 import logging.config
 from arq import Worker
 from arq.connections import RedisSettings
@@ -12,15 +8,13 @@ from src.parser import Parser
 from src.telegram import Telegram
 from concurrent.futures import ProcessPoolExecutor
 from dotenv import load_dotenv
-
 load_dotenv()
-
-
 
 
 REDIS_SETTINGS = RedisSettings(os.getenv('REDIS_HOST', 'localhost'), int(os.getenv('REDIS_PORT', '6379')))
 PARSER_FUNCTIONS = [Parser.get_channel_info]
 TELEGRAM_FUNCTIONS = [Telegram.add_client]
+
 
 async def startup(ctx):
     telegram = Telegram()

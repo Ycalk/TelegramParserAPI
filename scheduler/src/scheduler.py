@@ -1,8 +1,13 @@
+import asyncio
 import logging
 from allocator.allocator import Allocator
 from arq.connections import RedisSettings
 from shared_models.parser.get_channel_info import GetChannelInfoRequest, GetChannelInfoResponse
+from shared_models.scheduler.add_channel import AddChannelRequest
+from shared_models.channel import Channel
+from typing import Optional
 from arq import create_pool
+from arq.jobs import Job
 
 
 class Scheduler:
@@ -26,6 +31,13 @@ class Scheduler:
         if not self.database_redis:
             self.database_redis = await create_pool(self.database_redis_settings, default_queue_name=self.database_queue_name)
     
+    async def get_channel(self, channel_id: Optional[int] = None, channel_link: Optional[str] = None) -> GetChannelInfoResponse:
+        request = GetChannelInfoRequest(channel_id = channel_id, channel_link=channel_link)
+        response = await self.parser_redis.enqueue_job('Parser.get_channel_info', request) # type: ignore
+        if not response:
+            raise ValueError(f"Failed to get response for channel {channel_id}")
+        return await response.result()
+        
     @staticmethod
     async def run_iteration(ctx):
         self: Scheduler = ctx['Scheduler_instance']
@@ -37,4 +49,31 @@ class Scheduler:
         
         self.logger.info("Running iteration")
         update_channels = self.allocator.get_next_channels()
-        pass
+        if not update_channels:
+            self.logger.info("No channels to update")
+            return
+        
+        jobs = [self.get_channel(channel_id=channel_id) for channel_id in update_channels]
+        
+        results = await asyncio.gather(*jobs, return_exceptions=True)
+
+        for result in results:
+            if isinstance(result, Exception):
+                self.logger.error(f"Failed to get channel info: {result}")
+                continue
+            else:
+                await self.database_redis.enqueue_job('Database.update_or_create_channel', result.channel) # type: ignore
+    
+    
+    # Methods
+    @staticmethod
+    async def add_channel(ctx, request: AddChannelRequest) -> Channel:
+        self: Scheduler = ctx['Scheduler_instance']
+        if not self.parser_redis:
+            await self.init()
+        if not isinstance(request, AddChannelRequest):
+            raise ValueError(f"Invalid request: {request}")
+        channel = await self.get_channel(channel_id=request.channel_id, channel_link=request.channel_link)
+        await self.database_redis.enqueue_job('Database.update_or_create_channel', channel.channel) # type: ignore
+        self.allocator.add_channel(channel.channel.channel_id)
+        return channel.channel

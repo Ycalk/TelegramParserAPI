@@ -1,4 +1,4 @@
-FROM python:3.9-slim
+FROM python:3.9-bullseye
 
 WORKDIR /app
 COPY shared_models /app/shared_models/shared_models

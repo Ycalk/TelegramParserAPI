@@ -30,7 +30,6 @@ def start_worker(worker_id: int, workers_count: int):
     log_level = 'DEBUG' if verbose else 'INFO'
     logging_config = default_log_config(verbose=verbose)
     logging_config['loggers']['database'] = {'level': log_level, 'handlers': ['arq.standard']}
-    logging_config['loggers']['payment'] = {'level': log_level, 'handlers': ['arq.standard']}
     
     logging.config.dictConfig(logging_config)
     worker = Worker(functions = FUNCTIONS,

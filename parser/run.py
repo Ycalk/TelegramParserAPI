@@ -1,14 +1,19 @@
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import logging.config
 from arq import Worker
 from arq.connections import RedisSettings
-import os
 from arq.logs import default_log_config
 import logging
 from src.parser import Parser
 from src.telegram import Telegram
 from concurrent.futures import ProcessPoolExecutor
 from dotenv import load_dotenv
+
 load_dotenv()
+
+
 
 
 REDIS_SETTINGS = RedisSettings(os.getenv('REDIS_HOST', 'localhost'), int(os.getenv('REDIS_PORT', '6379')))

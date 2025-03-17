@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from allocator.allocator import Allocator
+from allocator import Allocator
 from arq.connections import RedisSettings
 from shared_models.parser.get_channel_info import GetChannelInfoRequest, GetChannelInfoResponse
 from shared_models.scheduler.add_channel import AddChannelRequest
@@ -42,9 +42,7 @@ class Scheduler:
     async def run_iteration(ctx):
         self: Scheduler = ctx['Scheduler_instance']
         
-        if not self.parser_redis:
-            await self.init()
-        if not self.database_redis:
+        if not self.parser_redis or not self.database_redis:
             await self.init()
         
         self.logger.info("Running iteration")
@@ -69,10 +67,13 @@ class Scheduler:
     @staticmethod
     async def add_channel(ctx, request: AddChannelRequest) -> Channel:
         self: Scheduler = ctx['Scheduler_instance']
-        if not self.parser_redis:
+        
+        if not self.parser_redis or not self.database_redis:
             await self.init()
+            
         if not isinstance(request, AddChannelRequest):
             raise ValueError(f"Invalid request: {request}")
+        
         channel = await self.get_channel(channel_id=request.channel_id, channel_link=request.channel_link)
         await self.database_redis.enqueue_job('Database.update_or_create_channel', channel.channel) # type: ignore
         self.allocator.add_channel(channel.channel.channel_id)

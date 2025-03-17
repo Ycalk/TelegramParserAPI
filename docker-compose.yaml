@@ -1,0 +1,117 @@
+services:
+  redis:
+    image: redis:latest
+    restart: always
+    volumes:
+      - ./runtime/redis-data:/data
+    command: >
+      redis-server
+      --replicaof no one
+      --slave-read-only no
+    environment:
+      - REDIS_PASSWORD=salesmanagerbot
+      - REDIS_PORT=6379
+      - REDIS_DATABASES=16
+
+  mysql:
+    image: mysql:8.0
+    restart: always
+    volumes:
+      - ./runtime/mysql-data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    environment:
+      - MYSQL_ROOT_PASSWORD=wNKvCILsDJ
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --bind-address=0.0.0.0
+    hostname: mysql
+
+# Models in service
+
+  shared-models:
+    build:
+      context: ./shared_models
+      dockerfile: Dockerfile
+    image: telegram-parser-api-python-with-shared-models:latest
+
+# Services
+
+  api:
+    ports:
+      - "5000:5000"
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+      args:
+        IMAGE_WITH_MODELS: telegram-parser-api-python-with-shared-models:latest
+    depends_on:
+      - shared-models
+      - redis
+      - mysql
+    restart: always
+    environment:
+      - SERVER_PORT=5000
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PARSER_QUEUE_NAME=parser
+      - TELEGRAM_QUEUE_NAME=telegram
+      - DATABASE_QUEUE_NAME=database
+      - SCHEDULER_QUEUE_NAME=scheduler
+  
+  database:
+    build:
+      context: ./database
+      dockerfile: Dockerfile
+      args:
+        IMAGE_WITH_MODELS: telegram-parser-api-python-with-shared-models:latest
+    depends_on:
+      - shared-models
+      - redis
+      - mysql
+    restart: always
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MAX_JOBS=100
+      - MYSQL_URL=mysql://channels:channels_password@127.0.0.1:3306/channels_db
+      - WORKERS_COUNT=1
+      - DATABASE_QUEUE_NAME=database
+  
+  parser:
+    build:
+      context: ./parser
+      dockerfile: Dockerfile
+      args:
+        IMAGE_WITH_MODELS: telegram-parser-api-python-with-shared-models:latest
+    depends_on:
+      - shared-models
+      - redis
+      - mysql
+    restart: always
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MAX_JOBS=5
+      - MYSQL_URL=mysql://telegram:telegram_password@127.0.0.1:3306/telegram_db
+      - WORKERS_COUNT=2
+      - PARSER_QUEUE_NAME=parser
+      - TELEGRAM_QUEUE_NAME=telegram
+  
+  scheduler:
+    build:
+      context: ./scheduler
+      dockerfile: Dockerfile
+      args:
+        IMAGE_WITH_MODELS: telegram-parser-api-python-with-shared-models:latest
+    depends_on:
+      - shared-models
+      - redis
+      - mysql
+    restart: always
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MAX_JOBS=100
+      - PARSER_QUEUE_NAME=parser
+      - DATABASE_QUEUE_NAME=database
+      - SCHEDULER_QUEUE_NAME=scheduler
+  
+  

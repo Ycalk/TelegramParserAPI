@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from allocator import Allocator
+from .allocator import Allocator
 from arq.connections import RedisSettings
 from shared_models.parser.get_channel_info import GetChannelInfoRequest, GetChannelInfoResponse
 from shared_models.scheduler.add_channel import AddChannelRequest

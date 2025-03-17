@@ -1,9 +1,10 @@
+from urllib import request
 from app.config import ApiServiceConfig
 from fastapi import APIRouter, HTTPException
 import app.services as services
 from shared_models.database.get_channel import GetChannelRequest, GetChannelResponse
 from shared_models.database.get_channels_ids import GetChannelsIdsResponse
-from shared_models.database.get_24h_statistics import Get24hStatisticsRequest, Get24hStatisticsResponse
+from shared_models.database.get_24h_statistics import Get24hStatisticsRequest, Get24hStatisticsResponse, StatisticsSorting
 from shared_models import Channel as ChannelModel
 from fastapi import Depends
 
@@ -27,8 +28,9 @@ async def get_channels_ids():
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/get_24h_statistics", responses=ApiServiceConfig.DEFAULT_RESPONSE, response_model=Get24hStatisticsResponse)
-async def get_24h_statistics(request: Get24hStatisticsRequest = Depends()):
+async def get_24h_statistics(channel_id: int):
     try:
-        return await database_service.get_24h_statistics(request)
+        req = Get24hStatisticsRequest(channel_id=channel_id, sorting=StatisticsSorting.NEWEST)
+        return await database_service.get_24h_statistics(req)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

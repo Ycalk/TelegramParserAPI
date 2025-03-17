@@ -20,7 +20,7 @@ class Database(BaseService):
     
     async def get_channels_ids(self) -> GetChannelsIdsResponse:
         await self.init()
-        task: Optional[Job] = await self.redis.enqueue_job('Database.get_channel') # type: ignore
+        task: Optional[Job] = await self.redis.enqueue_job('Database.get_channels_ids') # type: ignore
         if task is None:
             raise ValueError("Task was not created")
         return await task.result()

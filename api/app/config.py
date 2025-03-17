@@ -15,4 +15,6 @@ class ApiServiceConfig:
 class RedisConfig:
     PARSER_QUEUE_NAME = os.getenv('PARSER_QUEUE_NAME', 'parser')
     TELEGRAM_QUEUE_NAME = os.getenv('TELEGRAM_QUEUE_NAME', 'telegram')
+    DATABASE_QUEUE_NAME = os.getenv('DATABASE_QUEUE_NAME', 'database')
+    
     REDIS_SETTINGS = RedisSettings(os.getenv('REDIS_HOST', 'localhost'), int(os.getenv('REDIS_PORT', '6379')))

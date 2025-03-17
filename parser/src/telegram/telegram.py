@@ -1,5 +1,7 @@
 import logging
 import os
+import sys
+sys.path.append(".")
 from telethon.sessions import MemorySession
 from telethon import TelegramClient
 from tortoise import Tortoise

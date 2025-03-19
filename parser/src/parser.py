@@ -25,7 +25,7 @@ class Parser:
             channel_entity = await activated_client.get_entity(entity)
         except ValueError:
             try:
-                channel_entity = await self.join_private_channel(activated_client, entity)
+                channel_entity = await self.join_private_channel(activated_client, entity) # type: ignore
             except InviteHashExpiredError as e:
                 raise InvalidChannelLink(entity, str(e))
             except FloodWaitError as e:
@@ -58,18 +58,16 @@ class Parser:
                     continue
         return await activated_client.get_entity(url)
     
-    async def get_channel(self, client, entity: types.Channel, url: Optional[str]) -> ChannelInfo:
-        channel_info : ChatFull = await client(GetFullChannelRequest(channel=entity)) # type: ignore
-        if url:
-            link = url
-        elif entity.username:
-            link = f"https://t.me/{entity.username}"
-        else:
-            link = f"https://t.me/c/{entity.id}/{1}"
+    async def get_channel(self, client, entity: types.Channel, url: str) -> ChannelInfo:
+        channel_info : ChatFull = await client(GetFullChannelRequest(channel=entity))  # type: ignore
+        if url.startswith('https://'):
+            url = url.removeprefix('https://')
+        elif url.startswith('http://'):
+            url = url.removeprefix('http://')
         
         return ChannelInfo(
             channel_id=channel_info.full_chat.id,
-            link=link,
+            link=url,
             name=entity.title,
             description=channel_info.full_chat.about,
             subscribers=channel_info.full_chat.participants_count, # type: ignore
@@ -96,8 +94,6 @@ class Parser:
     async def get_channel_info(ctx, request: GetChannelInfoRequest) -> GetChannelInfoResponse:
         self: Parser = ctx['Parser_instance']
         client = await self.telegram.get_client()
-        if request.channel_link is None:
-            raise ValueError("Supported only getting channel by its link")
         
         async with client:
             entity = await self.get_channel_entity(client, request.channel_link)

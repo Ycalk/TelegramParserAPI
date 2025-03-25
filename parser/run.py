@@ -8,6 +8,7 @@ from src.parser import Parser
 from src.telegram import Telegram
 from concurrent.futures import ProcessPoolExecutor
 from dotenv import load_dotenv
+from arq.cron import cron
 load_dotenv()
 
 
@@ -30,7 +31,7 @@ async def shutdown(ctx):
     logging.getLogger('arq').info('Shutting down...')
     await ctx['Telegram_instance'].close()
 
-def start_worker(worker_id: int, workers_count: int, functions, queue_name):
+def start_worker(worker_id: int, workers_count: int, functions, queue_name, cron_jobs=None):
     verbose = True
     log_level = 'DEBUG' if verbose else 'INFO'
     logging_config = default_log_config(verbose=verbose)
@@ -39,6 +40,7 @@ def start_worker(worker_id: int, workers_count: int, functions, queue_name):
     
     logging.config.dictConfig(logging_config)
     worker = Worker(functions = functions,
+                    cron_jobs=cron_jobs,
                     on_startup = startup,
                     on_shutdown = shutdown,
                     redis_settings = REDIS_SETTINGS,
@@ -52,7 +54,10 @@ def start_worker(worker_id: int, workers_count: int, functions, queue_name):
 def main(max_workers: int):
     with ProcessPoolExecutor(max_workers=max_workers + 1) as executor:
         for i in range(max_workers):
-            executor.submit(start_worker, i + 1, max_workers, PARSER_FUNCTIONS, os.getenv('PARSER_QUEUE_NAME', 'parser'))
+            executor.submit(start_worker, i + 1, max_workers, 
+                            PARSER_FUNCTIONS, 
+                            os.getenv('PARSER_QUEUE_NAME', 'parser'),
+                            [cron(Parser.update_client, minute={i + 1})])
         executor.submit(start_worker, 1, 1, TELEGRAM_FUNCTIONS, os.getenv('TELEGRAM_QUEUE_NAME', 'telegram'))
 
 

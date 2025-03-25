@@ -91,6 +91,13 @@ class Parser:
             
         return views
     
+    # Cron
+    @staticmethod
+    async def update_client(ctx):
+        self: Parser = ctx['Parser_instance']
+        await self.telegram.update_client()
+    
+    
     # Methods
     @staticmethod
     async def get_channel_info(ctx, request: GetChannelInfoRequest) -> GetChannelInfoResponse:

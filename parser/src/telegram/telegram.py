@@ -82,6 +82,9 @@ class Telegram:
         self.__initialized = False
         await Tortoise.close_connections()
     
+    async def update_client(self):
+        self.__initialized = False
+        await self.initialize()
     
     # Methods
     @staticmethod

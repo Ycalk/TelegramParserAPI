@@ -81,7 +81,6 @@ services:
       - redis
       - mysql
       - database
-      - parser
     restart: always
     environment:
       - MAX_JOBS=5

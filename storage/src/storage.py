@@ -2,6 +2,7 @@ import io
 from aioboto3 import Session
 from shared_models.storage.save_logo import SaveLogoRequest
 from shared_models.storage.get_logo import GetLogoRequest, GetLogoResponse
+import logging
 
 
 class Storage:
@@ -14,7 +15,8 @@ class Storage:
         )
         self.bucket_name = bucket_name
         self.endpoint_url = endpoint_url
-    
+        self.logger = logging.getLogger('storage')
+        
     def get_client(self):
         return self.session.client(service_name='s3', endpoint_url=self.endpoint_url)
     

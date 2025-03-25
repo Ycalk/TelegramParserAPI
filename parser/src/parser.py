@@ -12,7 +12,9 @@ from telethon.errors.rpcerrorlist import UserAlreadyParticipantError, InviteRequ
 from shared_models.parser.errors import FloodWait, InvalidChannelLink, UserBan, CannotGetChannelInfo
 from telethon.tl.functions.messages import ImportChatInviteRequest
 from shared_models import Channel as ChannelInfo
-from typing import Optional
+from shared_models.parser.get_image import GetImageRequest, GetImageResponse
+from telethon.tl.types import InputPhoto
+from telethon.tl.types import Photo
 
 
 class Parser:
@@ -97,6 +99,11 @@ class Parser:
         
         async with client:
             entity = await self.get_channel_entity(client, request.channel_link)
+            if request.get_logo:
+                logo = await client.download_profile_photo(entity, file=bytes) # type: ignore
+            else:
+                logo = None
             return GetChannelInfoResponse(
-                channel=await self.get_channel(client, entity, request.channel_link)
+                channel=await self.get_channel(client, entity, request.channel_link),
+                logo=logo # type: ignore
             )

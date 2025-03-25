@@ -33,11 +33,11 @@ class Database:
         self.logging.info(f"Updating or creating channel {channel.name}")
         result, created = await Channel.update_or_create(
             id=channel.channel_id,
-            link=channel.link,
             defaults={
                 'name': channel.name,
                 'description': channel.description,
-                'logo_id': channel.channel_photo_id
+                'logo_id': channel.channel_photo_id,
+                'link': channel.link
             }
         )
         await ChannelStatistics.create(

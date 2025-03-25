@@ -1,4 +1,3 @@
-from urllib import request, response
 from app.config import ApiServiceConfig
 from fastapi import APIRouter, HTTPException
 import app.services as services

@@ -74,7 +74,6 @@ class Parser:
             description=channel_info.full_chat.about,
             subscribers=channel_info.full_chat.participants_count, # type: ignore
             views=await self.__get_posts_views(client, entity),
-            channel_photo_id=str(entity.photo.photo_id) if entity.photo else None # type: ignore
         )
     
     async def __get_posts_views(self, client: TelegramClient, entity: types.Channel) -> int:
@@ -107,7 +106,10 @@ class Parser:
         async with client:
             entity = await self.get_channel_entity(client, request.channel_link)
             if request.get_logo:
-                logo = await client.download_profile_photo(entity, file=bytes) # type: ignore
+                try:
+                    logo = await client.download_profile_photo(entity, file=bytes) # type: ignore
+                except Exception:
+                    logo = None
             else:
                 logo = None
             return GetChannelInfoResponse(

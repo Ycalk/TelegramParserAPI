@@ -36,7 +36,6 @@ class Database:
             defaults={
                 'name': channel.name,
                 'description': channel.description,
-                'logo_id': channel.channel_photo_id,
                 'link': channel.link
             }
         )
@@ -68,7 +67,6 @@ class Database:
             link=channel.link,
             name=channel.name,
             description=channel.description,
-            channel_photo_id=channel.logo_id,
             subscribers=statistics.subscribers,
             views=statistics.views_24h
         )

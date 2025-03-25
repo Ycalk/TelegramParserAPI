@@ -6,7 +6,6 @@ class Channel(models.Model):
     link = fields.CharField(max_length=255, unique=True)
     name = fields.CharField(max_length=255)
     description = fields.TextField(null=True)
-    logo_id = fields.CharField(max_length=255, null=True)
     created_at = fields.DatetimeField(auto_now_add=True)
     
     def __str__(self):

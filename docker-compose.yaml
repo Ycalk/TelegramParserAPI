@@ -67,6 +67,8 @@ services:
       - MAX_JOBS=100
       - MYSQL_URL=mysql://channels:channels_password@mysql:3306/channels_db
       - WORKERS_COUNT=1
+    env_file:
+      - .env
   
   parser:
     build:
@@ -85,6 +87,8 @@ services:
       - MAX_JOBS=5
       - MYSQL_URL=mysql://telegram:telegram_password@mysql:3306/telegram_db
       - WORKERS_COUNT=2
+    env_file:
+      - .env
   
   scheduler:
     build:
@@ -98,6 +102,8 @@ services:
     restart: always
     environment:
       - MAX_JOBS=10
+    env_file:
+      - .env
   
   storage:
     build:
@@ -112,6 +118,8 @@ services:
     restart: always
     environment:
       - MAX_JOBS=10
+    env_file:
+      - .env
   
   
   

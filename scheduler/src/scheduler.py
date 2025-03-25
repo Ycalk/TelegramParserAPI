@@ -8,7 +8,6 @@ from shared_models.parser.get_channel_info import GetChannelInfoRequest, GetChan
 from shared_models.scheduler.add_channel import AddChannelRequest, AddChannelResponse
 from shared_models.database.get_channels_ids import GetChannelsIdsResponse
 from shared_models.storage.save_logo import SaveLogoRequest
-from shared_models import Channel
 from typing import Any, Optional
 from arq import create_pool
 from arq.jobs import Job
@@ -131,5 +130,13 @@ class Scheduler:
             raise ValueError(f"Invalid request: {request}")
         
         channel = await self.get_channel(channel_link=request.channel_link)
-        await self.database_redis.enqueue_job('Database.update_or_create_channel', channel.channel) # type: ignore
-        return AddChannelResponse(channel=channel.channel)
+        try:
+            await self.get_channel_from_db(channel.channel.channel_id)
+        except Exception:
+            await self.database_redis.enqueue_job('Database.update_or_create_channel', channel.channel) # type: ignore
+            if channel.logo is not None:
+                await self.update_logo(channel.channel.channel_id, channel.logo)
+            return AddChannelResponse(channel=channel.channel)
+        else:
+            raise ValueError(f"Channel already exists")
+        

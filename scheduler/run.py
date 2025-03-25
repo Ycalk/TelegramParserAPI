@@ -18,7 +18,8 @@ CRON = [cron(Scheduler.run_iteration, minute={*list(range(0, 59))})]
 async def startup(ctx):
     scheduler = Scheduler(144, 10, 
                           REDIS_SETTINGS, os.getenv('PARSER_QUEUE_NAME', 'parser'), 
-                          REDIS_SETTINGS, os.getenv('DATABASE_QUEUE_NAME', 'database'))
+                          REDIS_SETTINGS, os.getenv('DATABASE_QUEUE_NAME', 'database'),
+                          REDIS_SETTINGS, os.getenv('STORAGE_QUEUE_NAME', 'storage'))
     await scheduler.init()
     ctx['Scheduler_instance'] = scheduler
     logging.getLogger('arq').info(f'Startup done')

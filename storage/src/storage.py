@@ -2,6 +2,7 @@ import io
 from aioboto3 import Session
 from shared_models.storage.save_logo import SaveLogoRequest
 from shared_models.storage.get_logo import GetLogoRequest, GetLogoResponse
+from shared_models.storage.errors import LogoNotFoundError
 import logging
 
 
@@ -34,6 +35,10 @@ class Storage:
         self: Storage = ctx['Storage_instance']
         async with self.get_client() as s3_client: # type: ignore
             file_obj = io.BytesIO()
-            await s3_client.download_fileobj(self.bucket_name, f"{request.channel_id}.jpg", file_obj)
-            file_obj.seek(0)
-            return GetLogoResponse(logo=file_obj.read())
+            try:
+                await s3_client.download_fileobj(self.bucket_name, f"{request.channel_id}.jpg", file_obj)
+                file_obj.seek(0)
+                return GetLogoResponse(logo=file_obj.read())
+            except Exception as e:
+                self.logger.error(f"Error while downloading file: {e}")
+                raise LogoNotFoundError(request.channel_id)

@@ -1,13 +1,15 @@
 import asyncio
 import logging
+from types import CoroutineType
 from .allocator.allocator import Allocator
 from shared_models.database.get_channel import GetChannelRequest, GetChannelResponse
 from arq.connections import RedisSettings
 from shared_models.parser.get_channel_info import GetChannelInfoRequest, GetChannelInfoResponse
 from shared_models.scheduler.add_channel import AddChannelRequest, AddChannelResponse
 from shared_models.database.get_channels_ids import GetChannelsIdsResponse
+from shared_models.storage.save_logo import SaveLogoRequest
 from shared_models import Channel
-from typing import Optional
+from typing import Any, Optional
 from arq import create_pool
 from arq.jobs import Job
 
@@ -15,9 +17,12 @@ from arq.jobs import Job
 class Scheduler:
     def __init__(self, slots_count: int, allocation_interval_minutes: int, 
                  parser_redis: RedisSettings, parser_queue_name: str,
-                 database_redis: RedisSettings, database_queue_name: str) -> None:
+                 database_redis: RedisSettings, database_queue_name: str,
+                 storage_redis: RedisSettings, storage_queue_name: str) -> None:
         self.logger = logging.getLogger('scheduler')
-        self.allocator = Allocator(slots_count, allocation_interval_minutes)
+        self.allocator: Optional[Allocator] = None
+        self.slots_count = slots_count
+        self.allocation_interval_minutes = allocation_interval_minutes
         
         self.parser_redis_settings = parser_redis
         self.parser_redis = None
@@ -27,7 +32,9 @@ class Scheduler:
         self.database_redis = None
         self.database_queue_name = database_queue_name
         
-        self.__allocator_init = False
+        self.storage_redis_settings = storage_redis
+        self.storage_redis = None
+        self.storage_queue_name = storage_queue_name
     
     async def get_channel_from_db(self, channel_id: int) -> GetChannelResponse:
         task: Optional[Job] = await self.database_redis.enqueue_job('Database.get_channel', GetChannelRequest(channel_id=channel_id)) # type: ignore
@@ -52,38 +59,52 @@ class Scheduler:
                 channels.append(result) # type: ignore
         
         channels.sort(key=lambda x: x.last_update)
-        for channel in channels:
-            self.allocator.add_channel(channel.channel.channel_id)
+        self.allocator = Allocator(
+            self.slots_count, 
+            self.allocation_interval_minutes,
+            [channel.channel.channel_id for channel in channels])
         
     async def init(self):
         if not self.parser_redis:
             self.parser_redis = await create_pool(self.parser_redis_settings, default_queue_name=self.parser_queue_name)
         if not self.database_redis:
             self.database_redis = await create_pool(self.database_redis_settings, default_queue_name=self.database_queue_name)
-        if not self.__allocator_init:
+        if not self.storage_redis:
+            self.storage_redis = await create_pool(self.storage_redis_settings, default_queue_name=self.storage_queue_name)
+        if not self.allocator:
             await self.init_allocator()
-            self.__allocator_init = True
             
     async def get_channel(self, channel_link: str) -> GetChannelInfoResponse:
-        request = GetChannelInfoRequest(channel_link=channel_link)
+        request = GetChannelInfoRequest(channel_link=channel_link, get_logo=True)
         response = await self.parser_redis.enqueue_job('Parser.get_channel_info', request) # type: ignore
         if not response:
             raise ValueError(f"Failed to get response for channel {channel_link}")
         return await response.result()
-        
+    
+    async def update_logo(self, channel_id: int, logo: bytes):
+        request = SaveLogoRequest(channel_id=channel_id, logo=logo)
+        await self.storage_redis.enqueue_job('Storage.save', request) # type: ignore
+    
+    
+    # Cron
     @staticmethod
     async def run_iteration(ctx):
         self: Scheduler = ctx['Scheduler_instance']
-        if not self.parser_redis or not self.database_redis:
-            await self.init()
+        await self.init()
         
         self.logger.info("Running iteration")
-        update_channels = self.allocator.get_next_channels()
+        try:
+            update_channels = self.allocator.get_next_channels() # type: ignore
+        except ValueError as e:
+            self.logger.error(str(e))
+            self.logger.info("Initialization of allocator")
+            await self.init_allocator()
+            return
         if not update_channels:
             self.logger.info("No channels to update")
             return
-        
-        jobs = []
+
+        jobs: list[CoroutineType[Any, Any, GetChannelInfoResponse]] = []
         
         for channel_id in update_channels:
             channel = await self.get_channel_from_db(channel_id)
@@ -97,19 +118,18 @@ class Scheduler:
                 continue
             else:
                 await self.database_redis.enqueue_job('Database.update_or_create_channel', result.channel) # type: ignore
+                await self.update_logo(result.channel.channel_id, result.logo) # type: ignore
     
     
     # Methods
     @staticmethod
     async def add_channel(ctx, request: AddChannelRequest) -> AddChannelResponse:
         self: Scheduler = ctx['Scheduler_instance']
-        if not self.parser_redis or not self.database_redis:
-            await self.init()
+        await self.init()
             
         if not isinstance(request, AddChannelRequest):
             raise ValueError(f"Invalid request: {request}")
         
         channel = await self.get_channel(channel_link=request.channel_link)
         await self.database_redis.enqueue_job('Database.update_or_create_channel', channel.channel) # type: ignore
-        self.allocator.add_channel(channel.channel.channel_id)
         return AddChannelResponse(channel=channel.channel)

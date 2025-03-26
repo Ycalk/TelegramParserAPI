@@ -21,7 +21,7 @@ class Parser:
     
     async def get_channel_entity(self, activated_client: TelegramClient, entity) -> types.Channel:
         try:
-            channel_entity = await activated_client.get_entity(entity)
+            channel_entity = await activated_client.get_input_entity(entity)
         except ValueError:
             try:
                 channel_entity = await self.join_private_channel(activated_client, entity) # type: ignore
@@ -36,26 +36,19 @@ class Parser:
         return channel_entity # type: ignore
     
     async def join_private_channel(self, activated_client: TelegramClient, url: str):
-        if url.startswith('https://t.me/+'):
-            url_suffix = url.removeprefix('https://t.me/+')
-        else:
-            url_suffix = url.removeprefix('https://t.me/joinchat/')
+        invite_hash = url.split('/')[-1]
         try:
-            await activated_client(ImportChatInviteRequest(url_suffix))
+            await activated_client(ImportChatInviteRequest(invite_hash))
         except UserAlreadyParticipantError:
-            return await activated_client.get_entity(url)
+            return await activated_client.get_input_entity(url)
         except InviteRequestSentError:
-            counter = 0
-            while True:
-                counter += 1
-                if counter > 3:
-                    break
+            for _ in range(3):
+                await asyncio.sleep(10)
                 try:
-                    return await activated_client.get_entity(url)
+                    return await activated_client.get_input_entity(url)
                 except ValueError:
-                    await asyncio.sleep(10)
                     continue
-        return await activated_client.get_entity(url)
+        return await activated_client.get_input_entity(url)
     
     async def get_channel(self, client, entity: types.Channel, url: str) -> ChannelInfo:
         channel_info : ChatFull = await client(GetFullChannelRequest(channel=entity))  # type: ignore
@@ -99,17 +92,27 @@ class Parser:
     async def get_channel_info(ctx, request: GetChannelInfoRequest) -> GetChannelInfoResponse:
         self: Parser = ctx['Parser_instance']
         client = await self.telegram.get_client()
-        
+
         async with client:
-            entity = await self.get_channel_entity(client, request.channel_link)
-            if request.get_logo:
-                try:
-                    logo = await client.download_profile_photo(entity, file=bytes) # type: ignore
-                except Exception:
-                    logo = None
-            else:
+            try:
+                return await asyncio.wait_for(
+                    self._get_channel_info_internal(client, request), 
+                    timeout=60
+                )
+            except asyncio.TimeoutError:
+                await self.telegram.on_client_ban()
+                raise TimeoutError("Timeout while getting channel info. Client may be banned")
+                    
+    async def _get_channel_info_internal(self, client: TelegramClient, request: GetChannelInfoRequest) -> GetChannelInfoResponse:
+        entity = await self.get_channel_entity(client, request.channel_link)
+        if request.get_logo:
+            try:
+                logo = await client.download_profile_photo(entity, file=bytes)  # type: ignore
+            except Exception:
                 logo = None
-            return GetChannelInfoResponse(
-                channel=await self.get_channel(client, entity, request.channel_link),
-                logo=logo # type: ignore
-            )
+        else:
+            logo = None
+        return GetChannelInfoResponse(
+            channel=await self.get_channel(client, entity, request.channel_link),
+            logo=logo  # type: ignore
+        )

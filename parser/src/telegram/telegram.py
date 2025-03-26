@@ -17,7 +17,6 @@ from tortoise.expressions import F
 
 class Telegram:
     def __init__(self) -> None:
-        self.__initialized = False
         self.logger = logging.getLogger("telegram")
         self.__telegram_client: Optional[TelegramClient] = None
         self.__client: Optional[Client] = None
@@ -29,7 +28,7 @@ class Telegram:
         self.logger.info("Database initialized")
     
     async def initialize(self) -> None:
-        if self.__initialized:
+        if self.__client:
             return
         
         self.logger.info("Getting client")
@@ -61,7 +60,6 @@ class Telegram:
         
         try:
             self.__telegram_client = await tdesk.ToTelethon(session=MemorySession(), api=api, password=password) # type: ignore
-            self.__initialized = True
         except SessionPasswordNeededError as e:
             self.__client.working = False
             await self.__client.save()
@@ -70,7 +68,7 @@ class Telegram:
     async def get_client(self) -> TelegramClient:
         await self.initialize()
         if self.__telegram_client is None:
-            raise ValueError("Client is None")
+            raise ValueError("No available clients")
         return self.__telegram_client
     
     async def close(self) -> None:
@@ -79,13 +77,29 @@ class Telegram:
             self.__telegram_client = None
         if self.__client is not None:
             await Client.filter(id=self.__client.id).update(users_count=F('users_count') - 1)
-        self.__initialized = False
         await Tortoise.close_connections()
     
     async def update_client(self):
-        self.__initialized = False
+        new_client = await Client.filter(working=True).order_by("users_count", "id").first()
+        if new_client is None:
+            self.logger.error("No working clients found")
+            return
+        if self.__client is not None and new_client.id == self.__client.id:
+            self.logger.info("Client is the same")
+            return
+
+        old_client = self.__client
+        old_telegram_client = self.__telegram_client
+        
+        self.__client = None
         await self.initialize()
-    
+        
+        if old_client is not None:
+            self.logger.info("Disconnecting from old client")
+            await Client.filter(id=old_client.id).update(users_count=F('users_count') - 1)
+            if old_telegram_client is not None:
+                await old_telegram_client.disconnect() # type: ignore
+        
     # Methods
     @staticmethod
     async def add_client(ctx, tdata: bytes) -> None:

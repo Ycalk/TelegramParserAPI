@@ -38,7 +38,7 @@ class Parser:
     async def join_private_channel(self, activated_client: TelegramClient, url: str):
         invite_hash = url.split('/')[-1]
         try:
-            await activated_client(ImportChatInviteRequest(invite_hash))
+            await activated_client(ImportChatInviteRequest(invite_hash)) # type: ignore
         except UserAlreadyParticipantError:
             return await activated_client.get_input_entity(url)
         except InviteRequestSentError:

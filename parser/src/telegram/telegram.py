@@ -11,6 +11,7 @@ from typing import Optional
 from telethon.errors import SessionPasswordNeededError
 from shared_models.parser.errors import SessionPasswordNeeded
 import zipfile
+from opentele.exception import OpenTeleException
 import io
 from tortoise.expressions import F
 
@@ -64,6 +65,12 @@ class Telegram:
             self.__client.working = False
             await self.__client.save()
             raise SessionPasswordNeeded()
+        except OpenTeleException as e:
+            self.logger.info(f"Exception in initialization: {str(e)}")
+            self.__client.working = False
+            await self.__client.save()
+            self.__client = None
+            self.__telegram_client = None
         
     async def get_client(self) -> TelegramClient:
         await self.initialize()
@@ -139,6 +146,8 @@ class Telegram:
         if not os.path.exists(os.path.join(target_directory, "tdata")):
             raise zipfile.BadZipFile("tdata directory not found")
         
+        tdata_path = os.path.join(Config.TDATA_PATH, str(new_client.id), "tdata")
+        
         api = API.TelegramDesktop(
             api_id=telegram_credentials.api_id,
             api_hash=telegram_credentials.api_hash,
@@ -149,7 +158,7 @@ class Telegram:
             system_lang_code=telegram_credentials.system_lang_code,
             lang_pack=telegram_credentials.lang_pack,
         )
-        tdesk = TDesktop(target_directory, api)
+        tdesk = TDesktop(tdata_path, api)
         pass_path = os.path.join(Config.TDATA_PATH, str(new_client.id), "2FA.txt")
         password = None
         if os.path.exists(pass_path):
@@ -160,8 +169,8 @@ class Telegram:
             await telegram_client.disconnect() # type: ignore
         except SessionPasswordNeededError as e:
             raise SessionPasswordNeeded()
-        except Exception as e:
-            raise ValueError("Account not working")
+        except BaseException as e:
+            raise ValueError(f"Account not working: {str(e)}")
         
         
         new_client.working = True

@@ -30,7 +30,7 @@ async def shutdown(ctx):
 
 
 def main():
-    verbose = True
+    verbose = os.getenv('VERBOSE', '1') == '1'
     log_level = 'DEBUG' if verbose else 'INFO'
     logging_config = default_log_config(verbose=verbose)
     logging_config['loggers']['scheduler'] = {'level': log_level, 'handlers': ['arq.standard']}

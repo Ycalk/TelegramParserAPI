@@ -25,7 +25,7 @@ async def shutdown(ctx):
     await ctx['Telegram_instance'].close()
 
 def start_worker(worker_id: int, workers_count: int):
-    verbose = True
+    verbose = os.getenv('VERBOSE', '1') == '1'
     log_level = 'DEBUG' if verbose else 'INFO'
     logging_config = default_log_config(verbose=verbose)
     logging_config['loggers']['database'] = {'level': log_level, 'handlers': ['arq.standard']}

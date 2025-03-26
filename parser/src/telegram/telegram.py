@@ -139,5 +139,30 @@ class Telegram:
         if not os.path.exists(os.path.join(target_directory, "tdata")):
             raise zipfile.BadZipFile("tdata directory not found")
         
+        api = API.TelegramDesktop(
+            api_id=telegram_credentials.api_id,
+            api_hash=telegram_credentials.api_hash,
+            device_model=telegram_credentials.device_model,
+            system_version=telegram_credentials.system_version,
+            app_version=telegram_credentials.app_version,
+            lang_code=telegram_credentials.lang_code,
+            system_lang_code=telegram_credentials.system_lang_code,
+            lang_pack=telegram_credentials.lang_pack,
+        )
+        tdesk = TDesktop(target_directory, api)
+        pass_path = os.path.join(Config.TDATA_PATH, str(new_client.id), "2FA.txt")
+        password = None
+        if os.path.exists(pass_path):
+            password = open(pass_path).read().strip()
+        try:
+            telegram_client: TelegramClient = await tdesk.ToTelethon(session=MemorySession(), api=api, password=password) # type: ignore
+            await telegram_client.connect()
+            await telegram_client.disconnect() # type: ignore
+        except SessionPasswordNeededError as e:
+            raise SessionPasswordNeeded()
+        except Exception as e:
+            raise ValueError("Account not working")
+        
+        
         new_client.working = True
         await new_client.save()

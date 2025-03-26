@@ -97,9 +97,18 @@ class Telegram:
         if old_client is not None:
             self.logger.info("Disconnecting from old client")
             await Client.filter(id=old_client.id).update(users_count=F('users_count') - 1)
-            if old_telegram_client is not None:
-                await old_telegram_client.disconnect() # type: ignore
-        
+        if old_telegram_client is not None:
+            await old_telegram_client.disconnect() # type: ignore
+    
+    async def on_client_ban(self):
+        if self.__client is not None:
+            self.logger.info("Client is banned")
+            self.__client.working = False
+            await self.__client.save()
+            self.__client = None
+            await self.update_client()
+    
+    
     # Methods
     @staticmethod
     async def add_client(ctx, tdata: bytes) -> None:

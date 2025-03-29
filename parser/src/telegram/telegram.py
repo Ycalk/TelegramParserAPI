@@ -1,26 +1,21 @@
 import logging
 import os
-from telethon.sessions import MemorySession
-from telethon import TelegramClient
+from .custom_client import CustomClient, RedisConfig
 from tortoise import Tortoise
 from ..config import Config, TORTOISE_ORM, TelegramClientConfig
 from .models import Client, TelegramCredentials
-from opentele.td import TDesktop
-from opentele.api import API
-from typing import Optional
-from telethon.errors import SessionPasswordNeededError
-from shared_models.parser.errors import SessionPasswordNeeded
 import zipfile
-from opentele.exception import OpenTeleException
 import io
-from tortoise.expressions import F
 
 
 class Telegram:
-    def __init__(self) -> None:
+    def __init__(self, redis_host: str, redis_port: int, telegram_clients_redis_db: int) -> None:
         self.logger = logging.getLogger("telegram")
-        self.__telegram_client: Optional[TelegramClient] = None
-        self.__client: Optional[Client] = None
+        self.__redis_config = RedisConfig(
+            host=redis_host,
+            port=redis_port,
+            db=telegram_clients_redis_db
+        )
     
     async def init_database(self) -> None:
         self.logger.info("Initializing database")
@@ -28,93 +23,15 @@ class Telegram:
         await Tortoise.generate_schemas()
         self.logger.info("Database initialized")
     
-    async def initialize(self) -> None:
-        if self.__client:
-            return
-        
-        self.logger.info("Getting client")
-        self.__client = await Client.filter(working=True).order_by("users_count", "id").first()
-        if self.__client is None:
-            self.logger.error("No working clients found")
-            return 
-        await Client.filter(id=self.__client.id).update(users_count=F('users_count') + 1)
-        telegram_credentials: TelegramCredentials = await self.__client.telegram_credentials
-        
-        self.logger.info("Creating session")
-        tdata_path = os.path.join(Config.TDATA_PATH, str(self.__client.id), "tdata")
-        api = API.TelegramDesktop(
-            api_id=telegram_credentials.api_id,
-            api_hash=telegram_credentials.api_hash,
-            device_model=telegram_credentials.device_model,
-            system_version=telegram_credentials.system_version,
-            app_version=telegram_credentials.app_version,
-            lang_code=telegram_credentials.lang_code,
-            system_lang_code=telegram_credentials.system_lang_code,
-            lang_pack=telegram_credentials.lang_pack,
-        )
-        tdesk = TDesktop(tdata_path, api)
-        
-        pass_path = os.path.join(Config.TDATA_PATH, str(self.__client.id), "2FA.txt")
-        password = None
-        if os.path.exists(pass_path):
-            password = open(pass_path).read().strip()
-        
-        try:
-            self.__telegram_client = await tdesk.ToTelethon(session=MemorySession(), api=api, password=password) # type: ignore
-        except SessionPasswordNeededError as e:
-            self.__client.working = False
-            await self.__client.save()
-            raise SessionPasswordNeeded()
-        except OpenTeleException as e:
-            self.logger.info(f"Exception in initialization: {str(e)}")
-            self.__client.working = False
-            await self.__client.save()
-            self.__client = None
-            self.__telegram_client = None
-        
-    async def get_client(self) -> TelegramClient:
-        await self.initialize()
-        if self.__telegram_client is None:
-            raise ValueError("No available clients")
-        return self.__telegram_client
-    
     async def close(self) -> None:
-        if self.__telegram_client is not None:
-            await self.__telegram_client.disconnect() # type: ignore
-            self.__telegram_client = None
-        if self.__client is not None:
-            await Client.filter(id=self.__client.id).update(users_count=F('users_count') - 1)
         await Tortoise.close_connections()
     
-    async def update_client(self):
-        new_client = await Client.filter(working=True).order_by("users_count", "id").first()
-        if new_client is None:
-            self.logger.error("No working clients found")
-            return
-        if self.__client is not None and new_client.id == self.__client.id:
-            self.logger.info("Client is the same")
-            return
-
-        old_client = self.__client
-        old_telegram_client = self.__telegram_client
+    async def get_client(self) -> CustomClient:
+        client = await Client.filter(working=True).order_by("users_count", "id").first()
+        if not client:
+            raise ValueError("No working clients found")
         
-        self.__client = None
-        await self.initialize()
-        
-        if old_client is not None:
-            self.logger.info("Disconnecting from old client")
-            await Client.filter(id=old_client.id).update(users_count=F('users_count') - 1)
-        if old_telegram_client is not None:
-            await old_telegram_client.disconnect() # type: ignore
-    
-    async def on_client_ban(self):
-        if self.__client is not None:
-            self.logger.info("Client is banned")
-            self.__client.working = False
-            await self.__client.save()
-            self.__client = None
-            await self.update_client()
-    
+        return CustomClient(client, self.__redis_config)
     
     # Methods
     @staticmethod
@@ -138,6 +55,7 @@ class Telegram:
             working=False
         )
         await new_client.save()
+        
         target_directory = os.path.join(Config.TDATA_PATH, str(new_client.id))
         os.makedirs(target_directory, exist_ok=True)
         with io.BytesIO(tdata) as zip_buffer:
@@ -146,32 +64,8 @@ class Telegram:
         if not os.path.exists(os.path.join(target_directory, "tdata")):
             raise zipfile.BadZipFile("tdata directory not found")
         
-        tdata_path = os.path.join(Config.TDATA_PATH, str(new_client.id), "tdata")
-        
-        api = API.TelegramDesktop(
-            api_id=telegram_credentials.api_id,
-            api_hash=telegram_credentials.api_hash,
-            device_model=telegram_credentials.device_model,
-            system_version=telegram_credentials.system_version,
-            app_version=telegram_credentials.app_version,
-            lang_code=telegram_credentials.lang_code,
-            system_lang_code=telegram_credentials.system_lang_code,
-            lang_pack=telegram_credentials.lang_pack,
-        )
-        tdesk = TDesktop(tdata_path, api)
-        pass_path = os.path.join(Config.TDATA_PATH, str(new_client.id), "2FA.txt")
-        password = None
-        if os.path.exists(pass_path):
-            password = open(pass_path).read().strip()
-        try:
-            telegram_client: TelegramClient = await tdesk.ToTelethon(session=MemorySession(), api=api, password=password) # type: ignore
-            await telegram_client.connect()
-            await telegram_client.disconnect() # type: ignore
-        except SessionPasswordNeededError as e:
-            raise SessionPasswordNeeded()
-        except BaseException as e:
-            raise ValueError(f"Account not working: {str(e)}")
-        
-        
-        new_client.working = True
-        await new_client.save()
+        client = CustomClient(new_client, self.__redis_config)
+        async with client as activated_client:
+            self.logger.info('Client activated')
+            new_client.working = True
+            await new_client.save()

@@ -67,7 +67,7 @@ services:
       - MAX_JOBS=100
       - MYSQL_URL=mysql://channels:channels_password@mysql:3306/channels_db
       - WORKERS_COUNT=1
-      - VERBOSE=1
+      - VERBOSE=0
     env_file:
       - .env
   
@@ -86,8 +86,9 @@ services:
     environment:
       - MAX_JOBS=5
       - MYSQL_URL=mysql://telegram:telegram_password@mysql:3306/telegram_db
-      - WORKERS_COUNT=2
-      - VERBOSE=1
+      - WORKERS_COUNT=3
+      - VERBOSE=0
+      - TELEGRAM_CLIENTS_REDIS_DB=5
     env_file:
       - .env
   
@@ -103,7 +104,7 @@ services:
     restart: always
     environment:
       - MAX_JOBS=10
-      - VERBOSE=1
+      - VERBOSE=0
     env_file:
       - .env
   
@@ -119,8 +120,8 @@ services:
       - mysql
     restart: always
     environment:
-      - MAX_JOBS=10
-      - VERBOSE=1
+      - MAX_JOBS=100
+      - VERBOSE=0
     env_file:
       - .env
   

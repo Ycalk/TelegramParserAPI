@@ -18,9 +18,10 @@ TELEGRAM_FUNCTIONS = [Telegram.add_client]
 
 
 async def startup(ctx):
-    telegram = Telegram()
+    telegram = Telegram(os.getenv('REDIS_HOST', 'localhost'),
+                        int(os.getenv('REDIS_PORT', '6379')),
+                        int(os.getenv('TELEGRAM_CLIENTS_REDIS_DB', '5')))
     await telegram.init_database()
-    await telegram.initialize()
     parser = Parser(telegram)
     ctx['Parser_instance'] = parser
     ctx['Telegram_instance'] = telegram

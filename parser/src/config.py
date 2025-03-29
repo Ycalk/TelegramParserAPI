@@ -8,8 +8,8 @@ class Config:
     TDATA_PATH = os.path.join(os.path.dirname(__file__), "..", "telegram", "tdata")
 
 class TelegramClientConfig:
-    API_ID = 2040
-    API_HASH = "b18441a1ff607e10a989891a5462e627"
+    API_ID = int(os.getenv('API_ID', '0'))
+    API_HASH = os.getenv('API_HASH', '')
     DEVICE_MODEL = "PC"
     SYSTEM_VERSION = "Windows:7"
     APP_VERSION = "1.0.1"

@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 from typing import Any, Dict, Union
 from arq.connections import RedisSettings
+import uuid
 load_dotenv()
 
 
@@ -10,7 +11,10 @@ class ApiServiceConfig:
     DEFAULT_RESPONSE: Dict[Union[int,str], Dict[str, Any]] = {500: {"description": "Internal Error"}, 
                                                               504: {"description": "Timeout Error"},
                                                               400: {"description": "Something went wrong while processing request"},
-                                                              200: {"description": "Success"}}
+                                                              200: {"description": "Success"},
+                                                              403: {"description": "Invalid key"},}
+
+    SECRET_KEY = os.getenv('SECRET_KEY', uuid.uuid4().hex)
 
 class RedisConfig:
     PARSER_QUEUE_NAME = os.getenv('PARSER_QUEUE_NAME', 'parser')

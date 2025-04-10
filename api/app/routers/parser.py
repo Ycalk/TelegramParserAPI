@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
 from app.config import ApiServiceConfig
 import app.services as services
 from shared_models.parser.get_channel_info import GetChannelInfoResponse, GetChannelInfoRequest
 from shared_models.parser.errors import SessionPasswordNeeded, InvalidChannelLink, FloodWait, CannotGetChannelInfo
+from app.services.token import verify_api_key
 
 
 parser_service = services.Parser()
@@ -11,7 +12,7 @@ router = APIRouter(prefix="/parser", tags=["Parser"])
 
 
 @router.post("/add_client", responses=ApiServiceConfig.DEFAULT_RESPONSE)
-async def add_client(tdata: UploadFile = File(...)):
+async def add_client(tdata: UploadFile = File(...), api_key_verified: None = Depends(verify_api_key)):
     """Add new telegram account"""
     try:
         await telegram_service.add_client(tdata.file.read())
@@ -22,7 +23,7 @@ async def add_client(tdata: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail={"message": str(e)})
 
 @router.post("/get_channel_info", responses=ApiServiceConfig.DEFAULT_RESPONSE, response_model=GetChannelInfoResponse)
-async def get_channel_info(request: GetChannelInfoRequest):
+async def get_channel_info(request: GetChannelInfoRequest, api_key_verified: None = Depends(verify_api_key)):
     """Get current channel data without writing to the database"""
     try:
         return await parser_service.get_channel_info(request)

@@ -11,7 +11,7 @@ load_dotenv()
 
 
 REDIS_SETTINGS = RedisSettings(os.getenv('REDIS_HOST', 'localhost'), int(os.getenv('REDIS_PORT', '6379')))
-FUNCTIONS = [Database.update_or_create_channel, Database.get_channel, Database.get_channels_ids, Database.get_24h_statistics]
+FUNCTIONS = [Database.update_or_create_channel, Database.get_channel, Database.get_channel_by_link, Database.get_channels_ids, Database.get_24h_statistics]
 
 async def startup(ctx):
     database = Database()

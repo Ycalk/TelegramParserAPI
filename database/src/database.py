@@ -7,6 +7,7 @@ from shared_models.database.get_channel import GetChannelRequest, GetChannelResp
 from shared_models.database.errors import ChannelDoesNotExistError, StatsDoesNotExistError
 from shared_models.database.get_channels_ids import GetChannelsIdsResponse
 from shared_models.database.get_24h_statistics import Get24hStatisticsRequest, Get24hStatisticsResponse, StatisticsSorting, StatisticsItem
+from shared_models.database.get_channel_by_link import GetChannelByLinkRequest, GetChannelByLinkResponse
 from .models import Channel, ChannelStatistics
 from tortoise.exceptions import DoesNotExist
 
@@ -73,6 +74,34 @@ class Database:
         
         return GetChannelResponse(last_update=int(statistics.recorded_at.timestamp()), channel=channel_response)
     
+    @staticmethod
+    async def get_channel_by_link(ctx, request: GetChannelByLinkRequest) -> GetChannelByLinkResponse:
+        self: Database = ctx['Database_instance']
+        link = request.channel_link
+        if link.startswith('https://'):
+            link = link.removeprefix('https://')
+        elif link.startswith('http://'):
+            link = link.removeprefix('http://')
+
+        try:
+            channel = await Channel.get(link=link)
+        except DoesNotExist:
+            self.logging.error(f"Channel with link {link} does not exist")
+            raise ChannelDoesNotExistError(link)
+        statistics = await ChannelStatistics.filter(channel=channel).order_by("-recorded_at").first()
+        if statistics is None:
+            self.logging.error(f"Statistics for channel with link {link} do not exist")
+            raise StatsDoesNotExistError(link)
+        channel_response = ChannelSharedModel(
+            channel_id=channel.id,
+            link=channel.link,
+            name=channel.name,
+            description=channel.description,
+            subscribers=statistics.subscribers,
+            views=statistics.views_24h
+        )
+        return GetChannelByLinkResponse(last_update=int(statistics.recorded_at.timestamp()), channel=channel_response)
+        
     @staticmethod
     async def get_channels_ids(ctx) -> GetChannelsIdsResponse:
         ids = await Channel.all().values_list("id", flat=True)

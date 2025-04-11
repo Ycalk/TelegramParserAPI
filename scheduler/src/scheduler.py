@@ -9,6 +9,7 @@ from shared_models.scheduler.add_channel import AddChannelRequest, AddChannelRes
 from shared_models.database.get_channels_ids import GetChannelsIdsResponse
 from shared_models.storage.save_logo import SaveLogoRequest
 from shared_models.database.get_channel_by_link import GetChannelByLinkRequest, GetChannelByLinkResponse
+from shared_models.database.errors import ChannelDoesNotExistError
 from typing import Any, Optional
 from arq import create_pool
 from arq.jobs import Job
@@ -133,20 +134,18 @@ class Scheduler:
         try:
             get_channel_request = GetChannelByLinkRequest(channel_link=request.channel_link)
             r = await self.database_redis.enqueue_job('Database.get_channel_by_link', get_channel_request) # type: ignore
-            r.result() # type: ignore
-        except Exception:
-            pass
+            channel_by_link: GetChannelByLinkResponse = r.result() # type: ignore
+        except ChannelDoesNotExistError:
+            channel = await self.get_channel(channel_link=request.channel_link)
+            try:
+                await self.get_channel_from_db(channel.channel.channel_id)
+            except ChannelDoesNotExistError:
+                await self.database_redis.enqueue_job('Database.update_or_create_channel', channel.channel) # type: ignore
+                if channel.logo is not None:
+                    await self.update_logo(channel.channel.channel_id, channel.logo)
+                return AddChannelResponse(channel=channel.channel, success=True)
+            else:
+                return AddChannelResponse(channel=channel.channel, success=False)
         else:
-            raise ValueError(f"Channel already exists")
-        
-        channel = await self.get_channel(channel_link=request.channel_link)
-        try:
-            await self.get_channel_from_db(channel.channel.channel_id)
-        except Exception:
-            await self.database_redis.enqueue_job('Database.update_or_create_channel', channel.channel) # type: ignore
-            if channel.logo is not None:
-                await self.update_logo(channel.channel.channel_id, channel.logo)
-            return AddChannelResponse(channel=channel.channel)
-        else:
-            raise ValueError(f"Channel already exists")
+            return AddChannelResponse(channel=channel_by_link.channel, success=False)
         

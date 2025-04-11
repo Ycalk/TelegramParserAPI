@@ -137,15 +137,10 @@ class Scheduler:
             channel_by_link: GetChannelByLinkResponse = r.result() # type: ignore
         except ChannelDoesNotExistError:
             channel = await self.get_channel(channel_link=request.channel_link)
-            try:
-                await self.get_channel_from_db(channel.channel.channel_id)
-            except ChannelDoesNotExistError:
-                await self.database_redis.enqueue_job('Database.update_or_create_channel', channel.channel) # type: ignore
-                if channel.logo is not None:
-                    await self.update_logo(channel.channel.channel_id, channel.logo)
-                return AddChannelResponse(channel=channel.channel, success=True)
-            else:
-                return AddChannelResponse(channel=channel.channel, success=False)
+            await self.database_redis.enqueue_job('Database.update_or_create_channel', channel.channel) # type: ignore
+            if channel.logo is not None:
+                await self.update_logo(channel.channel.channel_id, channel.logo)
+            return AddChannelResponse(channel=channel.channel, success=True)
         else:
             return AddChannelResponse(channel=channel_by_link.channel, success=False)
         

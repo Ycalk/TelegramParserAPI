@@ -28,14 +28,14 @@ async def add_channel(request: AddChannelRequest, api_key_verified: None = Depen
             return JSONResponse(
                 status_code=200,
                 content={
-                    "channel": response.channel,
+                    "channel": response.channel.model_dump(),
                 },
             )
         else:
             return JSONResponse(
                 status_code=302,
                 content={
-                    "channel": response.channel,
+                    "channel": response.channel.model_dump(),
                 },
             )
     except Exception as e:

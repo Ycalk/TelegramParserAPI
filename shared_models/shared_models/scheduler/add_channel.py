@@ -6,3 +6,4 @@ class AddChannelRequest(BaseModel):
 
 class AddChannelResponse(BaseModel):
     channel: Channel
+    success: bool

@@ -13,7 +13,8 @@ class ApiServiceConfig:
                                                               400: {"description": "Something went wrong while processing request"},
                                                               200: {"description": "Success"},
                                                               403: {"description": "Invalid key"},}
-
+    PROJECT_NAME = "Telegram Parser API"
+    VERSION = "1.0.0"
     SECRET_KEY = os.getenv('SECRET_KEY', uuid.uuid4().hex)
 
 class RedisConfig:

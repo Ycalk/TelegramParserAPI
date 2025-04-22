@@ -44,6 +44,7 @@ class Database:
             channel=result,
             subscribers=channel.subscribers,
             views_24h=channel.views,
+            posts_count=channel.posts_count,
         )
         
         return UpdateOrCreateChannelResponse(record_created=created)
@@ -69,7 +70,8 @@ class Database:
             name=channel.name,
             description=channel.description,
             subscribers=statistics.subscribers,
-            views=statistics.views_24h
+            views=statistics.views_24h,
+            posts_count=statistics.posts_count
         )
         
         return GetChannelResponse(last_update=int(statistics.recorded_at.timestamp()), channel=channel_response)
@@ -98,7 +100,8 @@ class Database:
             name=channel.name,
             description=channel.description,
             subscribers=statistics.subscribers,
-            views=statistics.views_24h
+            views=statistics.views_24h,
+            posts_count=statistics.posts_count
         )
         return GetChannelByLinkResponse(last_update=int(statistics.recorded_at.timestamp()), channel=channel_response)
         
@@ -123,6 +126,7 @@ class Database:
         data = [StatisticsItem(
                     views=stat.views_24h,
                     subscribers=stat.subscribers,
+                    posts_count=stat.posts_count,
                     time=int(stat.recorded_at.timestamp())
                 ) for stat in statistics]
         

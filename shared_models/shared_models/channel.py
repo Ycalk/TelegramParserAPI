@@ -9,3 +9,4 @@ class Channel(BaseModel):
     description: Optional[str]
     subscribers: int
     views: int
+    posts_count: int

@@ -20,4 +20,5 @@ class StatisticsSorting(str, Enum):
 class StatisticsItem(BaseModel):
     views: int
     subscribers: int
+    posts_count: int
     time: int

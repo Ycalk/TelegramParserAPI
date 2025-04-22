@@ -63,19 +63,23 @@ class Parser:
         elif url.startswith('http://'):
             url = url.removeprefix('http://')
         
+        views, count = await self.__get_posts(client, entity)
+        
         return ChannelInfo(
             channel_id=channel_info.full_chat.id,
             link=url,
             name=entity.title,
             description=channel_info.full_chat.about,
             subscribers=channel_info.full_chat.participants_count, # type: ignore
-            views=await self.__get_posts_views(client, entity),
+            views=views,
+            posts_count=count,
         )
     
-    async def __get_posts_views(self, client: TelegramClient, entity: types.Channel) -> int:
+    async def __get_posts(self, client: TelegramClient, entity: types.Channel) -> tuple[int, int]:
         start_date = datetime.now(UTC)
         end_date = start_date - timedelta(hours=24)
         
+        count = 0
         views = 0
         async for post in client.iter_messages(entity, offset_date=start_date):
             post: types.Message
@@ -83,8 +87,9 @@ class Parser:
             if post_date.timestamp() < end_date.timestamp(): # type: ignore
                 break
             views += post.views or 0
+            count += 1
             
-        return views
+        return views, count
     
     # Cron
     @staticmethod

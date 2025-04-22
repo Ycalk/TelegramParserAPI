@@ -16,6 +16,7 @@ class ChannelStatistics(models.Model):
     channel = fields.ForeignKeyField("models.Channel", related_name="statistics")
     subscribers = fields.IntField()
     views_24h = fields.IntField()
+    posts_count = fields.IntField()
     recorded_at = fields.DatetimeField(auto_now_add=True)
     
     class Meta:

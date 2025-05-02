@@ -8,7 +8,7 @@ from telethon.tl.types.messages import ChatFull
 from telethon.tl import types
 from shared_models.parser.get_channel_info import GetChannelInfoRequest, GetChannelInfoResponse
 from .telegram import Telegram
-from telethon.errors.rpcerrorlist import UserAlreadyParticipantError, InviteRequestSentError, InviteHashExpiredError, AuthKeyDuplicatedError, UserDeactivatedBanError, FloodWaitError
+from telethon.errors.rpcerrorlist import UserAlreadyParticipantError, InviteRequestSentError, InviteHashExpiredError, UserDeactivatedBanError, FloodWaitError
 from shared_models.parser.errors import FloodWait, InvalidChannelLink, UserBan, CannotGetChannelInfo
 from telethon.tl.functions.messages import ImportChatInviteRequest
 from shared_models import Channel as ChannelInfo
@@ -81,12 +81,13 @@ class Parser:
         
         count = 0
         views = 0
-        async for post in client.iter_messages(entity, offset_date=start_date):
+        async for post in client.iter_messages(entity, offset_date=start_date):  # type: ignore
             post: types.Message
             post_date = post.date.replace(tzinfo=UTC) if post.date.tzinfo is None else post.date # type: ignore
             if post_date.timestamp() < end_date.timestamp(): # type: ignore
                 break
-            views += post.views or 0
+            if post.views is not None:
+                views = post.views
             count += 1
             
         return views, count

@@ -36,7 +36,7 @@ services:
 
   api:
     ports:
-      - "6000:6000"
+      - "8000:8000"
     build:
       context: ./api
       dockerfile: Dockerfile
@@ -48,7 +48,7 @@ services:
       - mysql
     restart: always
     environment:
-      - SERVER_PORT=6000
+      - SERVER_PORT=8000
     env_file:
       - .env
   

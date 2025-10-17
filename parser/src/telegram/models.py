@@ -9,6 +9,14 @@ class Client(Model):
     )
     users_count = fields.IntField(default=0)
     working = fields.BooleanField(default=True)
+    is_master = fields.BooleanField(default=False)
+    phone_number = fields.CharField(max_length=32, null=True)
+    master_client = fields.ForeignKeyField(
+        "models.Client",
+        related_name="child_clients",
+        null=True,
+        on_delete=fields.CASCADE,
+    )
 
 
 class TelegramCredentials(Model):

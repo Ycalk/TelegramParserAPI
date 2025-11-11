@@ -548,3 +548,6 @@ MigrationBackup/
 .ionide/
 
 # End of https://www.toptal.com/developers/gitignore/api/python,vs,visualstudiocode
+
+# Zed editor
+.zed

@@ -1,35 +1,38 @@
 import asyncio
-from datetime import datetime, timedelta
-from pytz import UTC
 import logging
-from telethon import TelegramClient
-from telethon.tl.functions.channels import GetFullChannelRequest
-from telethon.tl.types.messages import ChatFull
-from telethon.tl import types
+from datetime import datetime, timedelta
+
+from pytz import UTC
+from shared_models.message import Message as MessageSharedModel
+from shared_models.message import MessageMedia, MessageMediaType
+from shared_models.parser.errors import (
+    CannotGetChannelInfo,
+    FloodWait,
+    InvalidChannelLink,
+    UserBan,
+)
 from shared_models.parser.get_channel_info import (
     GetChannelInfoRequest,
     GetChannelInfoResponse,
 )
-from .telegram import Telegram
-from telethon.errors.rpcerrorlist import (
-    UserAlreadyParticipantError,
-    InviteRequestSentError,
-    InviteHashExpiredError,
-    UserDeactivatedBanError,
-    FloodWaitError,
-)
-from shared_models.parser.errors import (
-    FloodWait,
-    InvalidChannelLink,
-    UserBan,
-    CannotGetChannelInfo,
-)
-from telethon.tl.functions.messages import ImportChatInviteRequest
-from shared_models import Channel as ChannelInfo
-from shared_models.message import Message as MessageSharedModel
-from shared_models.message import MessageMedia, MessageMediaType
+from telethon import TelegramClient
 from telethon.errors.rpcbaseerrors import FloodError
+from telethon.errors.rpcerrorlist import (
+    FloodWaitError,
+    InviteHashExpiredError,
+    InviteRequestSentError,
+    UserAlreadyParticipantError,
+    UserDeactivatedBanError,
+)
+from telethon.tl import types
+from telethon.tl.functions.channels import GetFullChannelRequest
+from telethon.tl.functions.messages import ImportChatInviteRequest
+from telethon.tl.types.messages import ChatFull
+
+from shared_models import Channel as ChannelInfo
+
 from .config import Config
+from .telegram import Telegram
 
 
 class Parser:
@@ -150,7 +153,7 @@ class Parser:
             ):
                 data = None
                 if download_media:
-                    data = await client.download_media(post, file=bytes)  # type: ignore
+                    data = await client.download_media(post, file=bytes, thumb=-1)  # type: ignore
 
                 message_to_update = grouped_messages[group_key]
 

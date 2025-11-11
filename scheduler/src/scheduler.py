@@ -1,32 +1,34 @@
 import asyncio
 import logging
 from types import CoroutineType
-from .allocator.allocator import Allocator
-from shared_models.database.get_channel import GetChannelRequest, GetChannelResponse
+from typing import Any, Optional
+
+from arq import create_pool
 from arq.connections import RedisSettings
+from arq.jobs import Job
+from shared_models.database.errors import ChannelDoesNotExistError
+from shared_models.database.get_channel import GetChannelRequest, GetChannelResponse
+from shared_models.database.get_channel_by_link import (
+    GetChannelByLinkRequest,
+    GetChannelByLinkResponse,
+)
+from shared_models.database.get_channels_ids import GetChannelsIdsResponse
+from shared_models.database.get_messages import GetMessagesRequest, GetMessagesResponse
+from shared_models.database.update_or_create_message import (
+    UpdateOrCreateMessageRequest,
+    UpdateOrCreateMessageResponse,
+)
+from shared_models.message import Message as MessageSharedModel
+from shared_models.message import MessageMedia as MessageMediaSharedModel
 from shared_models.parser.get_channel_info import (
     GetChannelInfoRequest,
     GetChannelInfoResponse,
 )
 from shared_models.scheduler.add_channel import AddChannelRequest, AddChannelResponse
-from shared_models.database.get_channels_ids import GetChannelsIdsResponse
 from shared_models.storage.save_logo import SaveLogoRequest
-from shared_models.database.get_channel_by_link import (
-    GetChannelByLinkRequest,
-    GetChannelByLinkResponse,
-)
-from shared_models.database.errors import ChannelDoesNotExistError
-from shared_models.database.update_or_create_message import (
-    UpdateOrCreateMessageRequest,
-    UpdateOrCreateMessageResponse,
-)
-from shared_models.database.get_messages import GetMessagesRequest, GetMessagesResponse
 from shared_models.storage.save_media import SaveMediaRequest
-from shared_models.message import Message as MessageSharedModel
-from shared_models.message import MessageMedia as MessageMediaSharedModel
-from typing import Any, Optional
-from arq import create_pool
-from arq.jobs import Job
+
+from .allocator.allocator import Allocator
 
 
 class Scheduler:

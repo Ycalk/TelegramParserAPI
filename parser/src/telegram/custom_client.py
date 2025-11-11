@@ -1,16 +1,18 @@
 import os
 from dataclasses import dataclass
 from typing import Optional
-from telethon import TelegramClient
-from telethon.sessions import StringSession
-from opentele.td.tdesktop import TDesktop
+
 from opentele.api import API
-from .models import Client, TelegramCredentials
+from opentele.td.tdesktop import TDesktop
 from redis.asyncio import Redis
-from telethon.errors import SessionPasswordNeededError
 from shared_models.parser.errors import SessionPasswordNeeded
-from ..config import Config
+from telethon import TelegramClient
+from telethon.errors import SessionPasswordNeededError
+from telethon.sessions import StringSession
 from tortoise.expressions import F
+
+from ..config import Config
+from .models import Client, TelegramCredentials
 
 
 @dataclass
@@ -30,7 +32,8 @@ class CustomClient:
         self._session: Optional[StringSession] = None
 
     async def mark_as_ban(self) -> None:
-        self._client.working = False
+        # WARNING: Uncomment in production
+        # self._client.working = False
         await self._client.save()
 
     async def _get_client_from_tdata(self) -> TelegramClient:

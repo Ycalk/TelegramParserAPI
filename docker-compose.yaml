@@ -1,4 +1,12 @@
 services:
+  adminer:
+    image: adminer:4.8.1
+    ports:
+      - 80:8080
+    environment:
+      - ADMINER_DESIGN=modern
+    env_file:
+      - .env
   redis:
     image: redis:7.4
     restart: always
@@ -24,7 +32,7 @@ services:
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --bind-address=0.0.0.0
     hostname: mysql
 
-# Models in service
+  # Models in service
 
   shared-models:
     build:
@@ -32,11 +40,12 @@ services:
       dockerfile: Dockerfile
     image: telegram-parser-api-python-with-shared-models:latest
 
-# Services
+  # Services
 
   api:
     ports:
-      - "6000:6000"
+      - 6000:6000
+      - 8080:6000
     build:
       context: ./api
       dockerfile: Dockerfile
@@ -51,7 +60,7 @@ services:
       - SERVER_PORT=6000
     env_file:
       - .env
-  
+
   database:
     build:
       context: ./database
@@ -70,7 +79,7 @@ services:
       - VERBOSE=0
     env_file:
       - .env
-  
+
   parser:
     build:
       context: ./parser
@@ -91,7 +100,7 @@ services:
       - TELEGRAM_CLIENTS_REDIS_DB=5
     env_file:
       - .env
-  
+
   scheduler:
     build:
       context: ./scheduler
@@ -107,7 +116,7 @@ services:
       - VERBOSE=0
     env_file:
       - .env
-  
+
   storage:
     build:
       context: ./storage

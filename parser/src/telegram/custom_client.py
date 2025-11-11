@@ -32,8 +32,8 @@ class CustomClient:
         self._session: Optional[StringSession] = None
 
     async def mark_as_ban(self) -> None:
-        # WARNING: Uncomment in production
-        # self._client.working = False
+        # WARNING: Uncomment in production if commented
+        self._client.working = False
         await self._client.save()
 
     async def _get_client_from_tdata(self) -> TelegramClient:

@@ -102,6 +102,8 @@ services:
       - TELEGRAM_CLIENTS_REDIS_DB=5
     env_file:
       - .env
+    volumes:
+      - ./parser:/app
 
   scheduler:
     build:

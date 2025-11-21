@@ -28,7 +28,7 @@ class RedisConfig:
     SCHEDULER_QUEUE_NAME = os.getenv("SCHEDULER_QUEUE_NAME", "scheduler")
     STORAGE_QUEUE_NAME = os.getenv("STORAGE_QUEUE_NAME", "storage")
     REDIS_SETTINGS = RedisSettings(
-        os.getenv("REDIS_HOST", "localhost"), int(os.getenv("REDIS_PORT", "6379"))
+        os.getenv("REDIS_HOST", "redis"), int(os.getenv("REDIS_PORT", "6379"))
     )
     DEFAULT_TIMEOUT = int(os.getenv("DEFAULT_TIMEOUT", "10"))
     PARSER_TIMEOUT = int(os.getenv("PARSER_TIMEOUT", "100"))

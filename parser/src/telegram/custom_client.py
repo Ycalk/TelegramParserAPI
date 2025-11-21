@@ -1,17 +1,13 @@
 import os
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Tuple
+from urllib.parse import urlparse
 
-from opentele.api import API
-from opentele.td.tdesktop import TDesktop
 from redis.asyncio import Redis
-from shared_models.parser.errors import SessionPasswordNeeded
 from telethon import TelegramClient
-from telethon.errors import SessionPasswordNeededError
 from telethon.sessions import StringSession
 from tortoise.expressions import F
 
-from ..config import Config
 from .models import Client, TelegramCredentials
 
 
@@ -31,45 +27,56 @@ class CustomClient:
         self._t_client: Optional[TelegramClient] = None
         self._session: Optional[StringSession] = None
 
+    @staticmethod
+    def _get_proxy() -> Optional[Tuple]:
+        """Получает прокси из переменных окружения"""
+        # Вариант 1: Полная строка прокси
+        proxy_url = os.getenv("PROXY")
+        if proxy_url:
+            try:
+                parsed = urlparse(proxy_url)
+                if parsed.hostname and parsed.port:
+                    return (
+                        'http',
+                        parsed.hostname,
+                        parsed.port,
+                        parsed.username or '',
+                        parsed.password or ''
+                    )
+            except Exception:
+                pass
+
+        # Вариант 2: Отдельные переменные
+        proxy_host = os.getenv("PROXY_HOST")
+        proxy_port = os.getenv("PROXY_PORT")
+        if proxy_host and proxy_port:
+            try:
+                return (
+                    'http',
+                    proxy_host,
+                    int(proxy_port),
+                    os.getenv("PROXY_USERNAME", ""),
+                    os.getenv("PROXY_PASSWORD", "")
+                )
+            except ValueError:
+                pass
+
+        return None
+
     async def mark_as_ban(self) -> None:
         # WARNING: Uncomment in production if commented
         self._client.working = False
         await self._client.save()
-
-    async def _get_client_from_tdata(self) -> TelegramClient:
-        tdata_path = os.path.join(Config.TDATA_PATH, str(self._client.id), "tdata")
-        credentials: TelegramCredentials = await self._client.telegram_credentials
-        api = API.TelegramDesktop(
-            api_id=credentials.api_id,
-            api_hash=credentials.api_hash,
-            device_model=credentials.device_model,
-            system_version=credentials.system_version,
-            app_version=credentials.app_version,
-            lang_code=credentials.lang_code,
-            system_lang_code=credentials.system_lang_code,
-            lang_pack=credentials.lang_pack,
-        )
-        tdesk = TDesktop(tdata_path, api)
-
-        pass_path = os.path.join(Config.TDATA_PATH, str(self._client.id), "2FA.txt")
-        password = None
-        if os.path.exists(pass_path):
-            with open(pass_path, "r") as f:
-                password = f.read().strip()
-
-        return await tdesk.ToTelethon(
-            session=self._session,  # type: ignore
-            api=api,
-            password=password,  # type: ignore
-            auto_reconnect=False,
-        )
 
     async def __aenter__(self) -> TelegramClient:
         session_str = await self._redis.get(str(self._client.id))
 
         if session_str:
             self._session = StringSession(session_str.decode("utf-8"))
-            credentials: TelegramCredentials = await self._client.telegram_credentials
+            credentials: TelegramCredentials = (
+                await self._client.telegram_credentials
+            )
+            proxy = self._get_proxy()
             t_client = TelegramClient(
                 auto_reconnect=False,
                 session=self._session,
@@ -80,6 +87,7 @@ class CustomClient:
                 app_version=credentials.app_version,
                 lang_code=credentials.lang_code,
                 system_lang_code=credentials.system_lang_code,
+                proxy=proxy,
             )
             try:
                 await t_client.start()  # type: ignore
@@ -92,21 +100,12 @@ class CustomClient:
                 await self.mark_as_ban()
                 raise ValueError(f"Cannot start client: {str(e)}")
         else:
-            self._session = StringSession()
-            try:
-                t_client = await self._get_client_from_tdata()
-                await t_client.start()  # type: ignore
-                await Client.filter(id=self._client.id).update(
-                    users_count=F("users_count") + 1
-                )
-                self._t_client = t_client
-                return t_client
-            except SessionPasswordNeededError:
-                await self.mark_as_ban()
-                raise SessionPasswordNeeded()
-            except BaseException as e:
-                await self.mark_as_ban()
-                raise ValueError(f"Account not working: {str(e)}")
+            # Сессия не найдена в Redis
+            await self.mark_as_ban()
+            raise ValueError(
+                "Session not found in Redis for this client. "
+                "Please add client with .session file first."
+            )
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         if self._session:
@@ -114,6 +113,10 @@ class CustomClient:
                 str(self._client.id), self._session.save().encode("utf-8")
             )
         if self._t_client:
+            # Отключаем клиент перед обновлением счетчика
+            await self._t_client.disconnect()
             await Client.filter(id=self._client.id).update(
                 users_count=F("users_count") - 1
             )
+        # Закрываем соединение с Redis
+        await self._redis.close()

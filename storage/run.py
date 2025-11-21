@@ -27,7 +27,7 @@ sentry_sdk.init(
 )
 
 REDIS_SETTINGS = RedisSettings(
-    os.getenv("REDIS_HOST", "localhost"), int(os.getenv("REDIS_PORT", "6379"))
+    os.getenv("REDIS_HOST", "redis"), int(os.getenv("REDIS_PORT", "6379"))
 )
 FUNCTIONS = [Storage.get_logo, Storage.save_logo, Storage.get_media, Storage.save_media]
 DEFAULT_POLL_DELAY = float(os.getenv("DEFAULT_POLL_DELAY", "0.01"))

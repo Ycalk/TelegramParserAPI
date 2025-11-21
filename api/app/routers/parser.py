@@ -20,11 +20,12 @@ router = APIRouter(prefix="/parser", tags=["Parser"])
 
 @router.post("/add_client", responses=ApiServiceConfig.DEFAULT_RESPONSE)
 async def add_client(
-    tdata: UploadFile = File(...), api_key_verified: None = Depends(verify_api_key)
+    archive: UploadFile = File(..., description="ZIP archive containing .session and .json files"), 
+    api_key_verified: None = Depends(verify_api_key)
 ):
-    """Add new telegram account"""
+    """Add new telegram account from ZIP archive with .session and .json files"""
     try:
-        await telegram_service.add_client(tdata.file.read())
+        await telegram_service.add_client(archive.file.read())
         return {"message": "Client added successfully"}
     except SessionPasswordNeeded as e:
         raise HTTPException(

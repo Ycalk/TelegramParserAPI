@@ -29,7 +29,7 @@ sentry_sdk.init(
 )
 
 REDIS_SETTINGS = RedisSettings(
-    os.getenv("REDIS_HOST", "localhost"), int(os.getenv("REDIS_PORT", "6379"))
+    os.getenv("REDIS_HOST", "redis"), int(os.getenv("REDIS_PORT", "6379"))
 )
 PARSER_FUNCTIONS = [Parser.get_channel_info]
 TELEGRAM_FUNCTIONS = [Telegram.add_client]
@@ -38,7 +38,7 @@ DEFAULT_POLL_DELAY = float(os.getenv("DEFAULT_POLL_DELAY", "0.01"))
 
 async def startup(ctx):
     telegram = Telegram(
-        os.getenv("REDIS_HOST", "localhost"),
+        os.getenv("REDIS_HOST", "redis"),
         int(os.getenv("REDIS_PORT", "6379")),
         int(os.getenv("TELEGRAM_CLIENTS_REDIS_DB", "5")),
     )

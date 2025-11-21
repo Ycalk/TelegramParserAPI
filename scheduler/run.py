@@ -27,7 +27,7 @@ sentry_sdk.init(
 )
 
 REDIS_SETTINGS = RedisSettings(
-    os.getenv("REDIS_HOST", "localhost"), int(os.getenv("REDIS_PORT", "6379"))
+    os.getenv("REDIS_HOST", "redis"), int(os.getenv("REDIS_PORT", "6379"))
 )
 FUNCTIONS = [Scheduler.add_channel]
 CRON = [cron(Scheduler.run_iteration, minute={*list(range(0, 59))})]

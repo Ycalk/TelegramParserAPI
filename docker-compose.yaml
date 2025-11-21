@@ -60,6 +60,8 @@ services:
       - SERVER_PORT=6000
     env_file:
       - .env
+    volumes:
+      - ./api:/app
 
   database:
     build:

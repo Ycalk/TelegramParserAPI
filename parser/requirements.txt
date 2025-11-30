@@ -23,5 +23,6 @@ rsa==4.9
 Telethon==1.39.0
 TgCrypto==1.2.5
 tortoise-orm==0.24.2
+pysocks==1.7.1
 typing_extensions==4.12.2
 sentry-sdk==2.39.0

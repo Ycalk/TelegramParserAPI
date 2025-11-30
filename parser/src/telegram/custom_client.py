@@ -1,6 +1,6 @@
 import os
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 from urllib.parse import urlparse
 
 import socks
@@ -29,14 +29,13 @@ class CustomClient:
         self._session: Optional[StringSession] = None
 
     @staticmethod
-    def _get_proxy() -> Optional[Tuple]:
+    def _get_proxy() -> Optional[Union[Tuple, dict]]:
         """Получает прокси из переменных окружения.
 
-        Использует SOCKS5 для прокси с аутентификацией,
-        так как PySocks не поддерживает HTTP прокси с auth.
+        Поддерживает HTTP и SOCKS5 прокси с аутентификацией.
         """
-        # Определяем тип прокси (по умолчанию SOCKS5)
-        proxy_type = os.getenv("PROXY_TYPE", "socks5").lower()
+        # Определяем тип прокси из переменной или URL
+        proxy_type = os.getenv("PROXY_TYPE", "").lower()
 
         # Вариант 1: Полная строка прокси
         proxy_url = os.getenv("PROXY")
@@ -47,31 +46,47 @@ class CustomClient:
                     username = parsed.username or ""
                     password = parsed.password or ""
 
-                    # Определяем тип из схемы URL или переменной
+                    # Определяем тип из схемы URL
                     scheme = parsed.scheme.lower()
-                    if scheme == "socks5" or (
-                        scheme == "http" and proxy_type == "socks5"
-                    ):
+
+                    # Если указан SOCKS5 или принудительно через переменную
+                    if scheme == "socks5" or proxy_type == "socks5":
                         # SOCKS5 с аутентификацией
-                        return (
-                            socks.SOCKS5,
-                            parsed.hostname,
-                            parsed.port,
-                            username,
-                            password,
-                        )
-                    elif scheme == "http" and not username:
-                        # HTTP без аутентификации
-                        return (socks.HTTP, parsed.hostname, parsed.port)
-                    elif scheme == "http" and username:
-                        # HTTP с аутентификацией - используем SOCKS5
-                        return (
-                            socks.SOCKS5,
-                            parsed.hostname,
-                            parsed.port,
-                            username,
-                            password,
-                        )
+                        # Формат: type, host, port, True, username, password
+                        if username and password:
+                            return (
+                                socks.SOCKS5,
+                                parsed.hostname,
+                                parsed.port,
+                                True,  # Использование аутентификации
+                                username,
+                                password,
+                            )
+                        else:
+                            return (
+                                socks.SOCKS5,
+                                parsed.hostname,
+                                parsed.port,
+                            )
+
+                    # HTTP прокси
+                    elif scheme == "http" or scheme == "https":
+                        if username and password:
+                            # Для HTTP прокси с аутентификацией
+                            # используем словарь
+                            return {
+                                "proxy_type": socks.HTTP,
+                                "addr": parsed.hostname,
+                                "port": parsed.port,
+                                "username": username,
+                                "password": password,
+                            }
+                        else:
+                            return (
+                                socks.HTTP,
+                                parsed.hostname,
+                                parsed.port,
+                            )
             except Exception:
                 pass
 
@@ -83,18 +98,30 @@ class CustomClient:
                 username = os.getenv("PROXY_USERNAME", "")
                 password = os.getenv("PROXY_PASSWORD", "")
 
-                if proxy_type == "socks5" or (username and password):
-                    # SOCKS5 с аутентификацией
-                    return (
-                        socks.SOCKS5,
-                        proxy_host,
-                        int(proxy_port),
-                        username,
-                        password,
-                    )
+                if proxy_type == "socks5":
+                    if username and password:
+                        return (
+                            socks.SOCKS5,
+                            proxy_host,
+                            int(proxy_port),
+                            True,
+                            username,
+                            password,
+                        )
+                    else:
+                        return (socks.SOCKS5, proxy_host, int(proxy_port))
                 else:
-                    # HTTP без аутентификации
-                    return (socks.HTTP, proxy_host, int(proxy_port))
+                    # HTTP прокси
+                    if username and password:
+                        return {
+                            "proxy_type": socks.HTTP,
+                            "addr": proxy_host,
+                            "port": int(proxy_port),
+                            "username": username,
+                            "password": password,
+                        }
+                    else:
+                        return (socks.HTTP, proxy_host, int(proxy_port))
             except ValueError:
                 pass
 

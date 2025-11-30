@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Optional, Tuple
 from urllib.parse import urlparse
 
+import socks
 from redis.asyncio import Redis
 from telethon import TelegramClient
 from telethon.sessions import StringSession
@@ -29,20 +30,48 @@ class CustomClient:
 
     @staticmethod
     def _get_proxy() -> Optional[Tuple]:
-        """Получает прокси из переменных окружения"""
+        """Получает прокси из переменных окружения.
+
+        Использует SOCKS5 для прокси с аутентификацией,
+        так как PySocks не поддерживает HTTP прокси с auth.
+        """
+        # Определяем тип прокси (по умолчанию SOCKS5)
+        proxy_type = os.getenv("PROXY_TYPE", "socks5").lower()
+
         # Вариант 1: Полная строка прокси
         proxy_url = os.getenv("PROXY")
         if proxy_url:
             try:
                 parsed = urlparse(proxy_url)
                 if parsed.hostname and parsed.port:
-                    return (
-                        'http',
-                        parsed.hostname,
-                        parsed.port,
-                        parsed.username or '',
-                        parsed.password or ''
-                    )
+                    username = parsed.username or ""
+                    password = parsed.password or ""
+
+                    # Определяем тип из схемы URL или переменной
+                    scheme = parsed.scheme.lower()
+                    if scheme == "socks5" or (
+                        scheme == "http" and proxy_type == "socks5"
+                    ):
+                        # SOCKS5 с аутентификацией
+                        return (
+                            socks.SOCKS5,
+                            parsed.hostname,
+                            parsed.port,
+                            username,
+                            password,
+                        )
+                    elif scheme == "http" and not username:
+                        # HTTP без аутентификации
+                        return (socks.HTTP, parsed.hostname, parsed.port)
+                    elif scheme == "http" and username:
+                        # HTTP с аутентификацией - используем SOCKS5
+                        return (
+                            socks.SOCKS5,
+                            parsed.hostname,
+                            parsed.port,
+                            username,
+                            password,
+                        )
             except Exception:
                 pass
 
@@ -51,13 +80,21 @@ class CustomClient:
         proxy_port = os.getenv("PROXY_PORT")
         if proxy_host and proxy_port:
             try:
-                return (
-                    'http',
-                    proxy_host,
-                    int(proxy_port),
-                    os.getenv("PROXY_USERNAME", ""),
-                    os.getenv("PROXY_PASSWORD", "")
-                )
+                username = os.getenv("PROXY_USERNAME", "")
+                password = os.getenv("PROXY_PASSWORD", "")
+
+                if proxy_type == "socks5" or (username and password):
+                    # SOCKS5 с аутентификацией
+                    return (
+                        socks.SOCKS5,
+                        proxy_host,
+                        int(proxy_port),
+                        username,
+                        password,
+                    )
+                else:
+                    # HTTP без аутентификации
+                    return (socks.HTTP, proxy_host, int(proxy_port))
             except ValueError:
                 pass
 

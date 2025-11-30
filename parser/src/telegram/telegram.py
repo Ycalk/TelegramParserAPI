@@ -32,11 +32,42 @@ class Telegram:
         await Tortoise.close_connections()
 
     async def get_client(self) -> CustomClient:
-        client = await Client.filter(working=True).order_by("users_count", "id").first()
-        if not client:
+        """Получает рабочего клиента, пропуская нерабочих"""
+        clients = await Client.filter(working=True).order_by(
+            "users_count", "id"
+        ).all()
+
+        if not clients:
+            self.logger.error("No working clients found in database")
             raise ValueError("No working clients found")
 
-        return CustomClient(client, self.__redis_config)
+        # Пробуем клиентов по очереди
+        last_error = None
+        for client in clients:
+            try:
+                custom_client = CustomClient(client, self.__redis_config)
+                # Пробуем проверить доступность
+                self.logger.info(
+                    f"Trying client ID {client.id} "
+                    f"(users_count={client.users_count})"
+                )
+                return custom_client
+            except Exception as e:
+                self.logger.warning(
+                    f"Client ID {client.id} is not available: {e}. "
+                    "Trying next client..."
+                )
+                last_error = e
+                continue
+
+        # Если все клиенты не работают
+        self.logger.error(
+            f"All {len(clients)} clients failed. "
+            f"Last error: {last_error}"
+        )
+        raise ValueError(
+            f"No working clients found. Last error: {last_error}"
+        )
 
     # Methods
     @staticmethod

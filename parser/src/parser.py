@@ -181,7 +181,7 @@ class Parser:
     # Methods
     @staticmethod
     async def get_channel_info(
-        ctx, request: GetChannelInfoRequest
+        ctx, request: GetChannelInfoRequest, retry_count: int = 0
     ) -> GetChannelInfoResponse:
         self: Parser = ctx["Parser_instance"]
         non_active_client = await self.telegram.get_client()
@@ -192,15 +192,34 @@ class Parser:
                     self._get_channel_info_internal(client, request), timeout=60
                 )
             except asyncio.TimeoutError:
-                await non_active_client.mark_as_ban()
+                # await non_active_client.mark_as_ban()
+                if not await client.is_connected():
+                    await client.connect()
+                if not await client.is_connected():
+                    client.mark_as_ban()
+                raise TimeoutError(
+                    "Timeout while getting channel info. Client may be banned"
+                )
                 raise TimeoutError(
                     "Timeout while getting channel info. Client may be banned"
                 )
             except FloodWaitError as e:
-                raise FloodWait(e.seconds)
-            except FloodError as e:
-                await non_active_client.mark_as_ban()
-                raise UserBan("User is banned from the channel") from e
+                if retry_count < 3:
+                    wait_seconds = e.seconds
+                    attempt = retry_count + 1
+                    self.logger.warning(
+                        f"FloodWaitError: waiting {wait_seconds}s "
+                        f"(attempt {attempt}/3)"
+                    )
+                    return await self.get_channel_info(
+                        ctx, request, retry_count + 1
+                    )
+                else:
+                    self.logger.error(
+                        f"FloodWaitError: max retries (3) reached. "
+                        f"Last wait: {e.seconds}s"
+                    )
+                    raise FloodWait(e.seconds)
 
     async def _get_channel_info_internal(
         self, client: TelegramClient, request: GetChannelInfoRequest

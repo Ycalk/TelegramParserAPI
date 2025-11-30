@@ -1,3 +1,4 @@
+import logging
 import os
 from dataclasses import dataclass
 from typing import Optional, Tuple, Union
@@ -10,6 +11,8 @@ from telethon.sessions import StringSession
 from tortoise.expressions import F
 
 from .models import Client, TelegramCredentials
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -127,13 +130,19 @@ class CustomClient:
 
         return None
 
-    async def mark_as_ban(self) -> None:
-        # WARNING: Uncomment in production if commented
+    async def mark_as_ban(self, reason: str = "") -> None:
+        """Помечает клиента как нерабочий"""
+        logger.warning(
+            f"Marking client ID {self._client.id} as not working. Reason: {reason}"
+        )
         self._client.working = False
         await self._client.save()
 
     async def __aenter__(self) -> TelegramClient:
-        session_str = await self._redis.get(str(self._client.id))
+        client_id = self._client.id
+        logger.info(f"Attempting to start client ID {client_id}")
+
+        session_str = await self._redis.get(str(client_id))
 
         if session_str:
             self._session = StringSession(session_str.decode("utf-8"))
@@ -141,6 +150,13 @@ class CustomClient:
                 await self._client.telegram_credentials
             )
             proxy = self._get_proxy()
+
+            proxy_status = "enabled" if proxy else "disabled"
+            logger.debug(
+                f"Client ID {client_id}: Creating TelegramClient "
+                f"(api_id={credentials.api_id}, proxy={proxy_status})"
+            )
+
             t_client = TelegramClient(
                 auto_reconnect=False,
                 session=self._session,
@@ -155,17 +171,28 @@ class CustomClient:
             )
             try:
                 await t_client.start()  # type: ignore
-                await Client.filter(id=self._client.id).update(
+                await Client.filter(id=client_id).update(
                     users_count=F("users_count") + 1
                 )
                 self._t_client = t_client
+                logger.info(f"Client ID {client_id} started successfully")
                 return t_client
             except Exception as e:
-                await self.mark_as_ban()
-                raise ValueError(f"Cannot start client: {str(e)}")
+                error_msg = str(e)
+                error_type = type(e).__name__
+                logger.error(
+                    f"Client ID {client_id} failed to start. "
+                    f"Error type: {error_type}, Message: {error_msg}"
+                )
+                await self.mark_as_ban(f"{error_type}: {error_msg}")
+                raise ValueError(f"Cannot start client: {error_msg}")
         else:
             # Сессия не найдена в Redis
-            await self.mark_as_ban()
+            logger.error(
+                f"Client ID {client_id}: Session not found in Redis. "
+                "Client needs to be added via API first."
+            )
+            await self.mark_as_ban("Session not found in Redis")
             raise ValueError(
                 "Session not found in Redis for this client. "
                 "Please add client with .session file first."

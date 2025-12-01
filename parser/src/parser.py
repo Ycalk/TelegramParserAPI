@@ -16,7 +16,6 @@ from shared_models.parser.get_channel_info import (
     GetChannelInfoResponse,
 )
 from telethon import TelegramClient
-from telethon.errors.rpcbaseerrors import FloodError
 from telethon.errors.rpcerrorlist import (
     FloodWaitError,
     InviteHashExpiredError,
@@ -184,42 +183,79 @@ class Parser:
         ctx, request: GetChannelInfoRequest, retry_count: int = 0
     ) -> GetChannelInfoResponse:
         self: Parser = ctx["Parser_instance"]
-        non_active_client = await self.telegram.get_client()
 
-        async with non_active_client as client:
+        # Пробуем получить рабочего клиента с повторными попытками
+        max_client_retries = 3
+        client_retry = 0
+        last_client_error = None
+        
+        while client_retry < max_client_retries:
             try:
-                return await asyncio.wait_for(
-                    self._get_channel_info_internal(client, request), timeout=60
-                )
-            except asyncio.TimeoutError:
-                # await non_active_client.mark_as_ban()
-                if not await client.is_connected():
-                    await client.connect()
-                if not await client.is_connected():
-                    client.mark_as_ban()
-                raise TimeoutError(
-                    "Timeout while getting channel info. Client may be banned"
-                )
-                raise TimeoutError(
-                    "Timeout while getting channel info. Client may be banned"
-                )
-            except FloodWaitError as e:
-                if retry_count < 3:
-                    wait_seconds = e.seconds
-                    attempt = retry_count + 1
+                non_active_client = await self.telegram.get_client()
+                async with non_active_client as client:
+                    try:
+                        return await asyncio.wait_for(
+                            self._get_channel_info_internal(client, request),
+                            timeout=60
+                        )
+                    except asyncio.TimeoutError:
+                        await non_active_client.mark_as_ban(
+                            "Timeout while getting channel info"
+                        )
+                        raise TimeoutError(
+                            "Timeout while getting channel info. "
+                            "Client may be banned"
+                        )
+                    except FloodWaitError as e:
+                        if retry_count < 3:
+                            wait_seconds = e.seconds
+                            attempt = retry_count + 1
+                            self.logger.warning(
+                                f"FloodWaitError: waiting {wait_seconds}s "
+                                f"(attempt {attempt}/3)"
+                            )
+                            return await self.get_channel_info(
+                                ctx, request, retry_count + 1
+                            )
+                        else:
+                            self.logger.error(
+                                f"FloodWaitError: max retries (3) reached. "
+                                f"Last wait: {e.seconds}s"
+                            )
+                            raise FloodWait(e.seconds)
+            except ValueError as e:
+                error_msg = str(e)
+                if "Cannot start client" in error_msg:
+                    # Клиент не смог запуститься, пробуем следующий
+                    client_retry += 1
+                    last_client_error = e
                     self.logger.warning(
-                        f"FloodWaitError: waiting {wait_seconds}s "
-                        f"(attempt {attempt}/3)"
+                        f"Client failed to start (attempt {client_retry}/"
+                        f"{max_client_retries}): {error_msg}. "
+                        "Trying next client..."
                     )
-                    return await self.get_channel_info(
-                        ctx, request, retry_count + 1
-                    )
+                    if client_retry >= max_client_retries:
+                        self.logger.error(
+                            f"All client retries exhausted. "
+                            f"Last error: {error_msg}"
+                        )
+                        raise ValueError(
+                            f"Failed to start any client after "
+                            f"{max_client_retries} attempts: {error_msg}"
+                        )
+                    continue
                 else:
-                    self.logger.error(
-                        f"FloodWaitError: max retries (3) reached. "
-                        f"Last wait: {e.seconds}s"
-                    )
-                    raise FloodWait(e.seconds)
+                    # Другая ошибка, пробрасываем дальше
+                    raise
+            except Exception:
+                # Другие ошибки пробрасываем дальше
+                raise
+
+        # Если дошли сюда - все попытки исчерпаны
+        raise ValueError(
+            f"Failed to get working client. "
+            f"Last error: {last_client_error}"
+        )
 
     async def _get_channel_info_internal(
         self, client: TelegramClient, request: GetChannelInfoRequest

@@ -167,7 +167,7 @@ class CustomClient:
                 app_version=credentials.app_version,
                 lang_code=credentials.lang_code,
                 system_lang_code=credentials.system_lang_code,
-                # proxy=proxy,
+                proxy=proxy,
             )
             try:
                 await t_client.start()  # type: ignore

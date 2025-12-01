@@ -100,7 +100,7 @@ services:
       - WORKERS_COUNT=1
       - VERBOSE=0
       - TELEGRAM_CLIENTS_REDIS_DB=5
-      - PROXY=http://user-pias7720209579-sessid-u1yh9ysp:VySU188iXTInK@proxy.piaproxy.com:7000
+      - PROXY=http://user-pias7720209579-sessid-0yhjejhn:VySU188iXTInK@proxy.piaproxy.com:7000
     env_file:
       - .env
     volumes:

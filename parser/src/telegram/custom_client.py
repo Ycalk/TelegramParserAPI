@@ -82,7 +82,7 @@ class CustomClient:
                                 "addr": parsed.hostname,
                                 "port": parsed.port,
                                 "username": username,
-                                "password": password,
+                                # "password": password,
                             }
                         else:
                             return (

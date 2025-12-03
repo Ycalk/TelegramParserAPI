@@ -43,6 +43,7 @@ async def startup(ctx):
         int(os.getenv("TELEGRAM_CLIENTS_REDIS_DB", "5")),
     )
     await telegram.init_database()
+    await telegram.init_redis()
     parser = Parser(telegram)
     ctx["Parser_instance"] = parser
     ctx["Telegram_instance"] = telegram

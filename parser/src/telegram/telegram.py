@@ -2,6 +2,9 @@ import logging
 import os
 import json
 import tempfile
+from arq import create_pool
+from arq.connections import RedisSettings
+from typing import Optional
 import zipfile
 import io
 from .custom_client import CustomClient, RedisConfig
@@ -21,6 +24,18 @@ class Telegram:
         self.__redis_config = RedisConfig(
             host=redis_host, port=redis_port, db=telegram_clients_redis_db
         )
+        self.redis = None
+
+    async def init_redis(self):
+        """Инициализирует ARQ Redis пул для telegram очереди"""
+        if not self.redis:
+            self.redis = await create_pool(
+                RedisSettings(
+                    self.__redis_config.host,
+                    self.__redis_config.port
+                ),
+                default_queue_name=os.getenv("TELEGRAM_QUEUE_NAME", "telegram")
+            )
 
     async def init_database(self) -> None:
         self.logger.info("Initializing database")

@@ -2,7 +2,6 @@ import asyncio
 import logging
 from datetime import datetime, timedelta
 from .telegram.models import Client
-from redis.asyncio import Redis
 
 from pytz import UTC
 from shared_models.message import Message as MessageSharedModel
@@ -210,17 +209,13 @@ class Parser:
                             "Client may be banned"
                         )
                     except FloodWaitError as e:
-                        client_db = await Client.get(id=client.id)
+                        client_id = non_active_client._client.id
+                        client_db = await Client.get(id=client_id)
                         client_db.working = False
                         await client_db.save()
-                        redis = Redis(
-                            host=self.telegram.redis_config.host,
-                            port=self.telegram.redis_config.port,
-                            db=self.telegram.redis_config.db
-                        )
-                        await redis.enqueue_job(
+                        await self.telegram.redis.enqueue_job(
                             "Telegram.enable_client",
-                            client.id,
+                            client_id,
                             _defer_by=e.seconds
                         )
                         if retry_count < 3:
@@ -272,6 +267,18 @@ class Parser:
             f"Failed to get working client. "
             f"Last error: {last_client_error}"
         )
+
+    @staticmethod
+    async def enable_client(ctx, client_id: int) -> None:
+        """Включает клиента обратно после FloodWait"""
+        self: Telegram = ctx["Telegram_instance"]
+        try:
+            client = await Client.get(id=client_id)
+            client.working = True
+            await client.save()
+            self.logger.info(f"Client ID {client_id} enabled after FloodWait")
+        except Exception as e:
+            self.logger.error(f"Failed to enable client ID {client_id}: {e}")
 
     async def _get_channel_info_internal(
         self, client: TelegramClient, request: GetChannelInfoRequest

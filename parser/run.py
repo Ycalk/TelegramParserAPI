@@ -32,7 +32,7 @@ REDIS_SETTINGS = RedisSettings(
     os.getenv("REDIS_HOST", "redis"), int(os.getenv("REDIS_PORT", "6379"))
 )
 PARSER_FUNCTIONS = [Parser.get_channel_info]
-TELEGRAM_FUNCTIONS = [Telegram.add_client]
+TELEGRAM_FUNCTIONS = [Telegram.add_client, Telegram.enable_client]
 DEFAULT_POLL_DELAY = float(os.getenv("DEFAULT_POLL_DELAY", "0.01"))
 
 

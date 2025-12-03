@@ -195,7 +195,7 @@ class Parser:
                 non_active_client = await self.telegram.get_client()
                 async with non_active_client as client:
                     try:
-                        error = FloodWaitError(request=None, message="FLOOD_WAIT")
+                        error = FloodWaitError(request=None)
                         error.seconds = 60
                         raise error
                         return await asyncio.wait_for(

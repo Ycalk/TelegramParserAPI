@@ -1,6 +1,8 @@
 import asyncio
 import logging
 from datetime import datetime, timedelta
+from parser.src.telegram.models import Client
+from redis.asyncio import Redis
 
 from pytz import UTC
 from shared_models.message import Message as MessageSharedModel
@@ -207,6 +209,19 @@ class Parser:
                             "Client may be banned"
                         )
                     except FloodWaitError as e:
+                        client_db = await Client.get(id=client.id)
+                        client_db.working = False
+                        await client_db.save()
+                        redis = Redis(
+                            host=self.telegram.redis_config.host,
+                            port=self.telegram.redis_config.port,
+                            db=self.telegram.redis_config.db
+                        )
+                        await redis.enqueue_job(
+                            "Telegram.enable_client",
+                            client.id,
+                            _defer_by=e.seconds
+                        )
                         if retry_count < 3:
                             wait_seconds = e.seconds
                             attempt = retry_count + 1

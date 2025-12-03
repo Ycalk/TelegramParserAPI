@@ -69,6 +69,18 @@ class Telegram:
             f"No working clients found. Last error: {last_error}"
         )
 
+    @staticmethod
+    async def enable_client(ctx, client_id: int) -> None:
+        """Включает клиента обратно после FloodWait"""
+        self: Telegram = ctx["Telegram_instance"]
+        try:
+            client = await Client.get(id=client_id)
+            client.working = True
+            await client.save()
+            self.logger.info(f"Client ID {client_id} enabled after FloodWait")
+        except Exception as e:
+            self.logger.error(f"Failed to enable client ID {client_id}: {e}")
+
     # Methods
     @staticmethod
     async def add_client(ctx, archive_data: bytes) -> None:
@@ -134,10 +146,13 @@ class Telegram:
                 # Загружаем сессию из файла и конвертируем в StringSession
                 # Создаем временный клиент для конвертации сессии
                 sqlite_session = SQLiteSession(tmp_session_path)
+                # Получаем прокси из переменных окружения
+                proxy = CustomClient._get_proxy()
                 temp_client = TelegramClient(
                     sqlite_session,
                     api_id=telegram_credentials.api_id,
                     api_hash=telegram_credentials.api_hash,
+                    proxy=proxy,
                 )
                 
                 # Подключаемся и получаем строку сессии

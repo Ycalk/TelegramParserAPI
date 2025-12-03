@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from datetime import datetime, timedelta
-from parser.src.telegram.models import Client
+from .telegram.models import Client
 from redis.asyncio import Redis
 
 from pytz import UTC

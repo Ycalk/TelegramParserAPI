@@ -200,13 +200,9 @@ class Parser:
                             timeout=60
                         )
                     except asyncio.TimeoutError:
-                        await non_active_client.mark_as_ban(
-                            "Timeout while getting channel info"
-                        )
-                        raise TimeoutError(
-                            "Timeout while getting channel info. "
-                            "Client may be banned"
-                        )
+                        return await self.get_channel_info(
+                                ctx, request, retry_count + 1
+                            )
                     except FloodWait as e:
                         client_id = non_active_client._client.id
                         client_db = await Client.get(id=client_id)

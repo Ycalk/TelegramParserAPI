@@ -207,7 +207,7 @@ class Parser:
                             "Timeout while getting channel info. "
                             "Client may be banned"
                         )
-                    except FloodWaitError as e:
+                    except FloodWait as e:
                         client_id = non_active_client._client.id
                         client_db = await Client.get(id=client_id)
                         client_db.working = False

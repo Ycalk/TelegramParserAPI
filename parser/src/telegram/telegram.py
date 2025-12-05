@@ -1,6 +1,7 @@
 import logging
 import os
 import json
+import random
 import tempfile
 from arq import create_pool
 from arq.connections import RedisSettings
@@ -48,9 +49,9 @@ class Telegram:
 
     async def get_client(self) -> CustomClient:
         """Получает рабочего клиента, пропуская нерабочих"""
-        clients = await Client.filter(working=True).order_by(
-            "users_count", "id"
-        ).all()
+        clients = await Client.filter(working=True).all()
+        clients_list = list(clients)
+        random.shuffle(clients_list)
 
         if not clients:
             self.logger.error("No working clients found in database")

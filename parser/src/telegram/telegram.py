@@ -59,7 +59,7 @@ class Telegram:
 
         # Пробуем клиентов по очереди
         last_error = None
-        for client in clients:
+        for client in clients_list:
             try:
                 custom_client = CustomClient(client, self.__redis_config)
                 # Пробуем проверить доступность

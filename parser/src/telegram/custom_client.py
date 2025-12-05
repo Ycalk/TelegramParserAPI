@@ -180,11 +180,38 @@ class CustomClient:
             except Exception as e:
                 error_msg = str(e)
                 error_type = type(e).__name__
-                logger.error(
-                    f"Client ID {client_id} failed to start. "
-                    f"Error type: {error_type}, Message: {error_msg}"
+                
+                # Временные сетевые ошибки - не помечаем клиента как нерабочий
+                temporary_errors = (
+                    "IncompleteReadError",
+                    "RuntimeError",
+                    "ConnectionError",
+                    "TimeoutError",
+                    "OSError",
+                    "ConnectionResetError",
+                    "ConnectionAbortedError",
                 )
-                await self.mark_as_ban(f"{error_type}: {error_msg}")
+                
+                is_temporary = any(
+                    error_type == temp_error or temp_error in error_msg
+                    for temp_error in temporary_errors
+                )
+                
+                if is_temporary:
+                    logger.warning(
+                        f"Client ID {client_id} failed to start due to temporary network error. "
+                        f"Error type: {error_type}, Message: {error_msg}. "
+                        "Client will remain marked as working for retry."
+                    )
+                else:
+                    # Критические ошибки - помечаем как нерабочий
+                    logger.error(
+                        f"Client ID {client_id} failed to start. "
+                        f"Error type: {error_type}, Message: {error_msg}. "
+                        "Marking client as not working."
+                    )
+                    await self.mark_as_ban(f"{error_type}: {error_msg}")
+                
                 raise ValueError(f"Cannot start client: {error_msg}")
         else:
             # Сессия не найдена в Redis

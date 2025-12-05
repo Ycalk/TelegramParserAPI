@@ -61,6 +61,17 @@ def start_worker(worker_id: int, workers_count: int, functions, queue_name):
     verbose = os.getenv("VERBOSE", "1") == "1"
     log_level = "DEBUG" if verbose else "INFO"
     logging_config = default_log_config(verbose=verbose)
+    
+    # Добавляем форматтер с датой
+    logging_config["formatters"]["default"] = {
+        "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        "datefmt": "%Y-%m-%d %H:%M:%S",
+    }
+    
+    # Обновляем хэндлер, чтобы использовать форматтер с датой
+    if "arq.standard" in logging_config.get("handlers", {}):
+        logging_config["handlers"]["arq.standard"]["formatter"] = "default"
+    
     logging_config["loggers"]["telegram"] = {
         "level": log_level,
         "handlers": ["arq.standard"],

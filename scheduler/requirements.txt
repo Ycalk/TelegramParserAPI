@@ -13,3 +13,4 @@ python-dotenv==1.0.1
 redis==5.2.1
 typing_extensions==4.12.2
 sentry-sdk==2.39.0
+tortoise-orm==0.24.2

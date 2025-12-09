@@ -7,6 +7,9 @@ from app.models import (
 from fastapi.responses import JSONResponse
 from app.services import verify_api_key, Scheduler
 from fastapi import Depends
+from shared_models.parser.errors import (
+    InvalidChannelLink,
+)
 
 
 scheduler_service = Scheduler()
@@ -46,5 +49,7 @@ async def add_channel(request: AddChannelRequest, _: None = Depends(verify_api_k
                     "channel": response.channel.model_dump(),
                 },
             )
+    except InvalidChannelLink as e:
+        raise HTTPException(status_code=410, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

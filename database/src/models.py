@@ -3,7 +3,7 @@ from shared_models.message import MessageMediaType
 
 
 class Channel(models.Model):
-    id = fields.IntField(pk=True, generated=False)
+    id = fields.BigIntField(pk=True, generated=False)
     link = fields.CharField(max_length=255, unique=True)
     name = fields.CharField(max_length=255)
     description = fields.TextField(null=True)

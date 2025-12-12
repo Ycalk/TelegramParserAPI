@@ -95,7 +95,7 @@ services:
       - database
     restart: always
     environment:
-      - MAX_JOBS=5
+      - MAX_JOBS=1
       - MYSQL_URL=mysql://telegram:telegram_password@mysql:3306/telegram_db
       - WORKERS_COUNT=1
       - VERBOSE=0
@@ -117,7 +117,7 @@ services:
       - redis
     restart: always
     environment:
-      - MAX_JOBS=10
+      - MAX_JOBS=1
       - VERBOSE=0
     env_file:
       - .env

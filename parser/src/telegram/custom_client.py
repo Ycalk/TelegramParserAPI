@@ -27,9 +27,16 @@ class CustomClient:
         self._redis = Redis(
             host=redis_config.host, port=redis_config.port, db=redis_config.db
         )
+        # Redis для блокировок (отдельная БД)
+        self._redis_lock = Redis(
+            host=redis_config.host, port=redis_config.port, db=0
+        )
+        self._redis_config = redis_config
         self._client = client
         self._t_client: Optional[TelegramClient] = None
         self._session: Optional[StringSession] = None
+        # Отслеживаем, был ли увеличен счетчик
+        self._users_count_incremented = False
 
     @staticmethod
     def _get_proxy() -> Optional[Union[Tuple, dict]]:
@@ -133,7 +140,8 @@ class CustomClient:
     async def mark_as_ban(self, reason: str = "") -> None:
         """Помечает клиента как нерабочий"""
         logger.warning(
-            f"Marking client ID {self._client.id} as not working. Reason: {reason}"
+            f"Marking client ID {self._client.id} as not working. "
+            f"Reason: {reason}"
         )
         self._client.working = False
         await self._client.save()
@@ -141,6 +149,26 @@ class CustomClient:
     async def __aenter__(self) -> TelegramClient:
         client_id = self._client.id
         logger.info(f"Attempting to start client ID {client_id}")
+
+        # Проверяем, что клиент заблокирован (users_count должен быть 1)
+        # Счетчик был увеличен в get_client(), поэтому он должен быть 1
+        await self._client.refresh_from_db()
+        if self._client.users_count == 1:
+            # Клиент правильно заблокирован
+            self._users_count_incremented = True
+        else:
+            logger.warning(
+                f"Client ID {client_id} is not properly locked "
+                f"(users_count={self._client.users_count}), releasing lock"
+            )
+            # Освобождаем блокировку если что-то пошло не так
+            await Client.filter(id=client_id).update(
+                users_count=F("users_count") - 1
+            )
+            raise ValueError(
+                f"Client {client_id} is not locked "
+                f"(users_count={self._client.users_count})"
+            )
 
         session_str = await self._redis.get(str(client_id))
 
@@ -171,16 +199,29 @@ class CustomClient:
             )
             try:
                 await t_client.start()  # type: ignore
-                await Client.filter(id=client_id).update(
-                    users_count=F("users_count") + 1
-                )
+                # НЕ увеличиваем users_count здесь - он уже увеличен в
+                # get_client()
+                # Флаг _users_count_incremented уже установлен при проверке
+                # блокировки выше
                 self._t_client = t_client
                 logger.info(f"Client ID {client_id} started successfully")
                 return t_client
             except Exception as e:
                 error_msg = str(e)
                 error_type = type(e).__name__
-                
+
+                # Освобождаем блокировку при ошибке
+                # Счетчик был увеличен в get_client(), нужно уменьшить
+                await Client.filter(id=client_id).update(
+                    users_count=F("users_count") - 1
+                )
+                # Сбрасываем флаг, чтобы __aexit__() не уменьшал счетчик снова
+                self._users_count_incremented = False
+                logger.warning(
+                    f"Client ID {client_id} failed to start, lock released. "
+                    f"Error type: {error_type}, Message: {error_msg}"
+                )
+
                 # Временные сетевые ошибки - не помечаем клиента как нерабочий
                 temporary_errors = (
                     "IncompleteReadError",
@@ -191,19 +232,13 @@ class CustomClient:
                     "ConnectionResetError",
                     "ConnectionAbortedError",
                 )
-                
+
                 is_temporary = any(
                     error_type == temp_error or temp_error in error_msg
                     for temp_error in temporary_errors
                 )
-                
-                if is_temporary:
-                    logger.warning(
-                        f"Client ID {client_id} failed to start due to temporary network error. "
-                        f"Error type: {error_type}, Message: {error_msg}. "
-                        "Client will remain marked as working for retry."
-                    )
-                else:
+
+                if not is_temporary:
                     # Критические ошибки - помечаем как нерабочий
                     logger.error(
                         f"Client ID {client_id} failed to start. "
@@ -211,7 +246,7 @@ class CustomClient:
                         "Marking client as not working."
                     )
                     await self.mark_as_ban(f"{error_type}: {error_msg}")
-                
+
                 raise ValueError(f"Cannot start client: {error_msg}")
         else:
             # Сессия не найдена в Redis
@@ -226,15 +261,27 @@ class CustomClient:
             )
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
-        if self._session:
-            await self._redis.set(
-                str(self._client.id), self._session.save().encode("utf-8")
-            )
-        if self._t_client:
-            # Отключаем клиент перед обновлением счетчика
-            await self._t_client.disconnect()
-            await Client.filter(id=self._client.id).update(
-                users_count=F("users_count") - 1
-            )
+        client_id = self._client.id
+
+        try:
+            if self._session:
+                await self._redis.set(
+                    str(client_id), self._session.save().encode("utf-8")
+                )
+            if self._t_client:
+                # Отключаем клиент перед обновлением счетчика
+                await self._t_client.disconnect()
+        finally:
+            # Всегда уменьшаем счетчик, если он был увеличен
+            # Счетчик был увеличен в get_client(), нужно уменьшить
+            # Используем флаг для надежности
+            if self._users_count_incremented or self._client.users_count > 0:
+                await Client.filter(id=client_id).update(
+                    users_count=F("users_count") - 1
+                )
+                logger.debug(
+                    f"Decremented users_count for client ID {client_id}"
+                )
+
         # Закрываем соединение с Redis
         await self._redis.close()

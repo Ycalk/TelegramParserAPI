@@ -5,11 +5,11 @@ import random
 import tempfile
 from arq import create_pool
 from arq.connections import RedisSettings
-from typing import Optional
 import zipfile
 import io
 from .custom_client import CustomClient, RedisConfig
 from tortoise import Tortoise
+from tortoise.expressions import F
 from ..config import TORTOISE_ORM, TelegramClientConfig
 from .models import Client, TelegramCredentials
 from redis.asyncio import Redis
@@ -48,7 +48,13 @@ class Telegram:
         await Tortoise.close_connections()
 
     async def get_client(self) -> CustomClient:
-        """Получает рабочего клиента, пропуская нерабочих"""
+        """Получает рабочего клиента с блокировкой через Redis lock + users_count"""
+        # Освобождаем зависшие блокировки (для нерабочих клиентов)
+        await Client.filter(
+            working=False, users_count__gt=0
+        ).update(users_count=0)
+
+        # Получаем всех рабочих клиентов
         clients = await Client.filter(working=True).all()
         clients_list = list(clients)
         random.shuffle(clients_list)
@@ -57,33 +63,73 @@ class Telegram:
             self.logger.error("No working clients found in database")
             raise ValueError("No working clients found")
 
-        # Пробуем клиентов по очереди
-        last_error = None
-        for client in clients_list:
-            try:
-                custom_client = CustomClient(client, self.__redis_config)
-                # Пробуем проверить доступность
-                self.logger.info(
-                    f"Trying client ID {client.id} "
-                    f"(users_count={client.users_count})"
+        # Создаем Redis для блокировки
+        redis_lock = Redis(
+            host=self.__redis_config.host,
+            port=self.__redis_config.port,
+            db=0  # Используем отдельную БД для локов
+        )
+        
+        try:
+            # Пытаемся заблокировать клиента атомарно
+            for client in clients_list:
+                lock_key = f"client_lock:{client.id}"
+                
+                # Пытаемся получить Redis lock (атомарная операция)
+                # NX - set if not exists, EX - expire in seconds
+                lock_acquired = await redis_lock.set(
+                    lock_key, 
+                    "1", 
+                    nx=True,  # Только если ключ не существует
+                    ex=120    # TTL 120 секунд (на случай сбоя)
                 )
-                return custom_client
-            except Exception as e:
-                self.logger.warning(
-                    f"Client ID {client.id} is not available: {e}. "
-                    "Trying next client..."
-                )
-                last_error = e
-                continue
+                
+                if not lock_acquired:
+                    # Лок уже занят, пробуем следующего клиента
+                    self.logger.debug(
+                        f"Client ID {client.id} is locked in Redis, trying next..."
+                    )
+                    continue
+                
+                # Redis lock получен, теперь пытаемся обновить database
+                try:
+                    # Атомарная попытка увеличить users_count с 0 до 1
+                    updated = await Client.filter(
+                        id=client.id,
+                        users_count=0  # Проверяем, что счетчик = 0
+                    ).update(
+                        users_count=F("users_count") + 1
+                    )
 
-        # Если все клиенты не работают
-        self.logger.error(
-            f"All {len(clients)} clients failed. "
-            f"Last error: {last_error}"
-        )
-        raise ValueError(
-            f"No working clients found. Last error: {last_error}"
-        )
+                    if updated > 0:
+                        # Успешно заблокировали (увеличили с 0 до 1)
+                        await client.refresh_from_db()
+                        self.logger.info(
+                            f"Locked client ID {client.id} "
+                            f"(users_count={client.users_count})"
+                        )
+                        custom_client = CustomClient(client, self.__redis_config)
+                        return custom_client
+                    else:
+                        # Database блокировка не удалась, освобождаем Redis lock
+                        await redis_lock.delete(lock_key)
+                        self.logger.debug(
+                            f"Client ID {client.id} is already in use in DB "
+                            f"(users_count={client.users_count}), trying next..."
+                        )
+                        continue
+                except Exception as e:
+                    # При ошибке освобождаем Redis lock
+                    await redis_lock.delete(lock_key)
+                    raise
+
+            # Если все клиенты заняты
+            self.logger.error(
+                f"All {len(clients)} clients are in use (users_count > 0)"
+            )
+            raise ValueError("No available clients (all are in use)")
+        finally:
+            await redis_lock.close()
 
     @staticmethod
     async def enable_client(ctx, client_id: int) -> None:

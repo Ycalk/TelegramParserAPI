@@ -193,16 +193,27 @@ class Parser:
         while client_retry < max_client_retries:
             try:
                 non_active_client = await self.telegram.get_client()
+                
+                # Флаги для управления retry логикой
+                should_retry = False
+                retry_reason = None
+                flood_wait_seconds = None
+                
                 async with non_active_client as client:
                     try:
-                        return await asyncio.wait_for(
+                        result = await asyncio.wait_for(
                             self._get_channel_info_internal(client, request),
                             timeout=60
                         )
+                        # Успешно выполнено, возвращаем результат
+                        return result
                     except asyncio.TimeoutError:
-                        return await self.get_channel_info(
-                                ctx, request, retry_count + 1
-                            )
+                        self.logger.warning(
+                            f"Timeout while getting channel info "
+                            f"(attempt {retry_count + 1})"
+                        )
+                        should_retry = True
+                        retry_reason = "timeout"
                     except FloodWait as e:
                         client_id = non_active_client._client.id
                         client_db = await Client.get(id=client_id)
@@ -213,22 +224,42 @@ class Parser:
                             client_id,
                             _defer_by=e.seconds
                         )
+                        
                         if retry_count < 3:
                             wait_seconds = e.seconds
                             attempt = retry_count + 1
                             self.logger.warning(
-                                f"FloodWaitError: waiting {wait_seconds}s "
-                                f"(attempt {attempt}/3)"
+                                f"FloodWaitError: will retry after releasing client "
+                                f"(attempt {attempt}/3, wait {wait_seconds}s)"
                             )
-                            return await self.get_channel_info(
-                                ctx, request, retry_count + 1
-                            )
+                            should_retry = True
+                            retry_reason = "flood_wait"
+                            flood_wait_seconds = e.seconds
                         else:
                             self.logger.error(
                                 f"FloodWaitError: max retries (3) reached. "
                                 f"Last wait: {e.seconds}s"
                             )
                             raise FloodWait(e.seconds)
+                
+                # Клиент освобожден (вышли из async with)
+                # Теперь можно безопасно делать retry
+                if should_retry:
+                    if retry_reason == "timeout":
+                        # Небольшая задержка перед повтором
+                        await asyncio.sleep(1)
+                        return await self.get_channel_info(
+                            ctx, request, retry_count + 1
+                        )
+                    elif retry_reason == "flood_wait":
+                        # При FloodWait сразу retry (клиент уже отключен)
+                        return await self.get_channel_info(
+                            ctx, request, retry_count + 1
+                        )
+                
+                # Если не было retry, что-то пошло не так
+                break
+                
             except ValueError as e:
                 error_msg = str(e)
                 if "Cannot start client" in error_msg:
@@ -249,6 +280,8 @@ class Parser:
                             f"Failed to start any client after "
                             f"{max_client_retries} attempts: {error_msg}"
                         )
+                    # Небольшая задержка перед следующей попыткой
+                    await asyncio.sleep(0.5)
                     continue
                 else:
                     # Другая ошибка, пробрасываем дальше

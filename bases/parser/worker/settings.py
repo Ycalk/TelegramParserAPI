@@ -14,3 +14,6 @@ class WorkerSettings(BaseSettings):
 
     message_monitoring_time_limit_hours: int = 168
     channel_messages_stat_time_limit_hours: int = 24
+
+    image_bytes_limit: int = 10 * 1024 * 1024
+    documents_bytes_limit: int = 10 * 1024 * 1024

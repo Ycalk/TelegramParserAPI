@@ -751,27 +751,49 @@ class Worker:
                                 data = await client.download_media(
                                     original_message,
                                     file=bytes,  # pyright: ignore[reportArgumentType]
-                                    thumb=1,
                                 )
-                                if data is None:
-                                    data = await client.download_media(
-                                        original_message,
-                                        file=bytes,  # pyright: ignore[reportArgumentType]
-                                    )
                                 if data is None or not isinstance(data, bytes):
                                     logger.warning(
                                         "failed_to_download_media",
                                         message_id=original_message.id,
                                     )
                                     continue
+
+                                if len(data) > self.settings.image_bytes_limit:
+                                    logger.warning(
+                                        "media_too_large",
+                                        message_id=original_message.id,
+                                        size=len(data),
+                                    )
+                                    continue
+
                                 media_content = data
                             elif isinstance(
                                 original_message.media, types.MessageMediaDocument
                             ):
+                                if (
+                                    original_message.media.document is None
+                                    or isinstance(
+                                        original_message.media.document,
+                                        types.DocumentEmpty,
+                                    )
+                                ):
+                                    logger.warning(
+                                        "media_document_is_none",
+                                        message_id=original_message.id,
+                                    )
+                                    continue
+                                doc_size = original_message.media.document.size
+                                if doc_size > self.settings.documents_bytes_limit:
+                                    logger.warning(
+                                        "media_too_large",
+                                        message_id=original_message.id,
+                                        size=doc_size,
+                                    )
+                                    continue
                                 data = await client.download_media(
                                     original_message,
                                     file=bytes,  # pyright: ignore[reportArgumentType]
-                                    thumb=0,
                                 )
                                 if data is None or not isinstance(data, bytes):
                                     logger.warning(

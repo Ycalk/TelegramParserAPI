@@ -4,7 +4,7 @@ from uuid import UUID
 
 import structlog
 from dishka.integrations.fastapi import DishkaRoute, FromDishka
-from fastapi import APIRouter, Body, File, Form, Security, UploadFile, status
+from fastapi import APIRouter, Body, File, Form, Query, Security, UploadFile, status
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
 from parser.api.utils import (
@@ -32,7 +32,7 @@ tracer: Final[trace.Tracer] = trace.get_tracer("api.parser")
 @router.get("/task", status_code=status.HTTP_200_OK)
 async def get_task(
     parsing_task_dao: FromDishka[ParsingTaskDAO],
-    task_id: UUID = Body(..., description="Идентификатор задачи", embed=True),
+    task_id: UUID = Query(..., description="Идентификатор задачи"),
     _: None = Security(secret_key_check),
 ) -> ParsingTask:
     with tracer.start_as_current_span("api.get_task") as span:

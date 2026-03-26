@@ -10,10 +10,10 @@ from sqlalchemy.orm import Mapped, aliased, joinedload, mapped_column, relations
 from sqlalchemy.types import TIMESTAMP
 
 from ._base import BaseDAO, BaseDAOFactory, BaseModel
+from .channel_statistic import ChannelStatistic
 
 if TYPE_CHECKING:
     from .channel_message import ChannelMessage
-    from .channel_statistic import ChannelStatistic
     from .media import Media
     from .parsing_task import ParsingTask
 

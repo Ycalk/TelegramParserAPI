@@ -79,6 +79,8 @@ class ChannelMessageDAO(BaseDAO[ChannelMessage, UUID]):
         sorting: Literal["newest", "oldest"],
         skip: int,
         limit: int | None,
+        created_at_start: datetime | None = None,
+        created_at_end: datetime | None = None,
     ) -> list[ChannelMessage]:
         stmt = (
             select(ChannelMessage)
@@ -89,13 +91,19 @@ class ChannelMessageDAO(BaseDAO[ChannelMessage, UUID]):
                     MessageMediaLink.media_item
                 ),
             )
-            .offset(skip)
         )
+        if created_at_start is not None:
+            stmt = stmt.where(ChannelMessage.created_at >= created_at_start)
+
+        if created_at_end is not None:
+            stmt = stmt.where(ChannelMessage.created_at <= created_at_end)
 
         if sorting == "newest":
             stmt = stmt.order_by(ChannelMessage.created_at.desc())
         else:
             stmt = stmt.order_by(ChannelMessage.created_at.asc())
+
+        stmt = stmt.offset(skip)
 
         if limit is not None:
             stmt = stmt.limit(limit)

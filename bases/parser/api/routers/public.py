@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import Final, Literal
 from uuid import UUID
 
@@ -143,6 +144,22 @@ async def get_channel_ids(channel_dao: FromDishka[ChannelDAO]) -> list[int]:
         return result
 
 
+@router.get("/channel/all", status_code=status.HTTP_200_OK)
+async def get_all_channels(channel_dao: FromDishka[ChannelDAO]) -> list[Channel]:
+    with tracer.start_as_current_span("api.get_all_channels"):
+        logger.info("received_get_all_channels_request", stage="start")
+        channels_with_stats = await channel_dao.get_all_with_latest_statistics()
+        result = [
+            Channel.from_persistence(channel, newest_statistic)
+            for channel, newest_statistic in channels_with_stats
+        ]
+
+        logger.info(
+            "get_all_channels_request_completed", stage="complete", count=len(result)
+        )
+        return result
+
+
 @router.get("/channel/statistics", status_code=status.HTTP_200_OK)
 async def get_channel_statistics(
     channel_id: int,
@@ -187,6 +204,8 @@ async def get_channel_messages(
     sorting: Literal["newest", "oldest"] = "newest",
     skip: int = 0,
     limit: int | None = None,
+    created_at_start: int | None = None,
+    created_at_end: int | None = None,
 ) -> list[ChannelMessage]:
     with tracer.start_as_current_span("api.get_channel_messages") as span:
         request_logger = logger.bind(
@@ -196,10 +215,31 @@ async def get_channel_messages(
         span.set_attribute("sorting", sorting)
         span.set_attribute("skip", skip)
         span.set_attribute("limit", limit or "none")
+        span.set_attribute("created_at_start", created_at_start or "none")
+        span.set_attribute("created_at_end", created_at_end or "none")
+
+        if created_at_start is not None and created_at_end is not None:
+            if created_at_start > created_at_end:
+                raise CustomHTTPException(
+                    error="InvalidCreatedAtRange",
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    message=(
+                        "created_at_start must be less than or equal to created_at_end"
+                    ),
+                )
 
         request_logger.info("received_get_channel_messages_request", stage="start")
         messages = await channel_message_dao.get_channel_messages(
-            channel_id, sorting, skip, limit
+            channel_id,
+            sorting,
+            skip,
+            limit,
+            datetime.fromtimestamp(created_at_start, tz=timezone.utc)
+            if created_at_start
+            else None,
+            datetime.fromtimestamp(created_at_end, tz=timezone.utc)
+            if created_at_end
+            else None,
         )
 
         result = [ChannelMessage.from_persistence(message) for message in messages]

@@ -6,7 +6,7 @@ from uuid import UUID
 
 from sqlalchemy import BigInteger, ForeignKey, String, Text, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-from sqlalchemy.orm import Mapped, joinedload, mapped_column, relationship
+from sqlalchemy.orm import Mapped, aliased, joinedload, mapped_column, relationship
 from sqlalchemy.types import TIMESTAMP
 
 from ._base import BaseDAO, BaseDAOFactory, BaseModel
@@ -79,6 +79,33 @@ class ChannelDAO(BaseDAO[Channel, int]):
 
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
+
+    async def get_all_with_latest_statistics(
+        self,
+    ) -> list[tuple[Channel, ChannelStatistic]]:
+        subq = (
+            select(
+                ChannelStatistic.channel_id,
+                func.max(ChannelStatistic.recorded_at).label("max_recorded_at"),
+            )
+            .group_by(ChannelStatistic.channel_id)
+            .subquery()
+        )
+
+        cs_alias = aliased(ChannelStatistic)
+        stmt = (
+            select(Channel, cs_alias)
+            .options(joinedload(Channel.logo))
+            .join(subq, Channel.id == subq.c.channel_id)
+            .join(
+                cs_alias,
+                (cs_alias.channel_id == subq.c.channel_id)
+                & (cs_alias.recorded_at == subq.c.max_recorded_at),
+            )
+        )
+
+        result = await self._session.execute(stmt)
+        return list(result.unique().tuples().all())
 
 
 class ChannelDAOFactory(BaseDAOFactory[ChannelDAO]):

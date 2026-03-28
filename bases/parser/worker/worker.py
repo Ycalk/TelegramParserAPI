@@ -350,37 +350,50 @@ class Worker:
                 hour_limit: [
                     message.views
                     for message in collected_messages
-                    if message.created_at > now_utc - timedelta(hours=hour_limit)
+                    if now_utc - timedelta(hours=hour_limit + 6)
+                    <= message.created_at
+                    <= now_utc - timedelta(hours=hour_limit - 6)
                 ]
                 for hour_limit in (24, 48, 72, 96, 120, 144, 168)
             }
+
+            previous_statistic = await channel_statistic_dao.get_latest_by_channel_id(
+                persistence_channel.id
+            )
+
+            previous_messages_views: dict[int, int] = {
+                hour_limit: 0 for hour_limit in (24, 48, 72, 96, 120, 144, 168)
+            }
+            if previous_statistic is not None:
+                previous_messages_views = {
+                    24: previous_statistic.views_24h,
+                    48: previous_statistic.views_48h,
+                    72: previous_statistic.views_72h,
+                    96: previous_statistic.views_96h,
+                    120: previous_statistic.views_120h,
+                    144: previous_statistic.views_144h,
+                    168: previous_statistic.views_168h,
+                }
+
+            def get_views(hour_limit: int) -> int:
+                return (
+                    random.choice(hours_limit_messages_views[hour_limit])
+                    if len(hours_limit_messages_views[hour_limit]) != 0
+                    else previous_messages_views[hour_limit]
+                )
 
             await channel_statistic_dao.create(
                 channel=persistence_channel,
                 subscribers_count=full_channel.full_chat.participants_count or 0,  # pyright: ignore[reportAttributeAccessIssue]
                 views=sum(message.views for message in messages_stat),
                 posts_count=len(messages_stat),
-                views_24h=random.choice(hours_limit_messages_views[24])
-                if len(hours_limit_messages_views[24]) != 0
-                else 0,
-                views_48h=random.choice(hours_limit_messages_views[48])
-                if len(hours_limit_messages_views[48]) != 0
-                else 0,
-                views_72h=random.choice(hours_limit_messages_views[72])
-                if len(hours_limit_messages_views[72]) != 0
-                else 0,
-                views_96h=random.choice(hours_limit_messages_views[96])
-                if len(hours_limit_messages_views[96]) != 0
-                else 0,
-                views_120h=random.choice(hours_limit_messages_views[120])
-                if len(hours_limit_messages_views[120]) != 0
-                else 0,
-                views_144h=random.choice(hours_limit_messages_views[144])
-                if len(hours_limit_messages_views[144]) != 0
-                else 0,
-                views_168h=random.choice(hours_limit_messages_views[168])
-                if len(hours_limit_messages_views[168]) != 0
-                else 0,
+                views_24h=get_views(24),
+                views_48h=get_views(48),
+                views_72h=get_views(72),
+                views_96h=get_views(96),
+                views_120h=get_views(120),
+                views_144h=get_views(144),
+                views_168h=get_views(168),
                 posts_count_24h=len(hours_limit_messages_views[24]),
                 posts_count_48h=len(hours_limit_messages_views[48]),
                 posts_count_72h=len(hours_limit_messages_views[72]),

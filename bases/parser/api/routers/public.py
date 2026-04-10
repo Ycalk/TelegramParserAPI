@@ -207,7 +207,8 @@ async def get_channel_messages(
     limit: int | None = None,
     created_at_start: int | None = None,
     created_at_end: int | None = None,
-) -> list[ChannelMessage]:
+    with_html_text: bool = False,
+) -> list[ChannelMessage | ChannelMessageWithHTMLText]:
     with tracer.start_as_current_span("api.get_channel_messages") as span:
         request_logger = logger.bind(
             channel_id=channel_id, sorting=sorting, skip=skip, limit=limit or "none"
@@ -218,6 +219,7 @@ async def get_channel_messages(
         span.set_attribute("limit", limit or "none")
         span.set_attribute("created_at_start", created_at_start or "none")
         span.set_attribute("created_at_end", created_at_end or "none")
+        span.set_attribute("with_html_text", with_html_text)
 
         if created_at_start is not None and created_at_end is not None:
             if created_at_start > created_at_end:
@@ -243,7 +245,12 @@ async def get_channel_messages(
             else None,
         )
 
-        result = [ChannelMessage.from_persistence(message) for message in messages]
+        result = [
+            ChannelMessageWithHTMLText.from_persistence(message)
+            if with_html_text
+            else ChannelMessage.from_persistence(message)
+            for message in messages
+        ]
 
         request_logger.info(
             "get_channel_messages_request_completed",

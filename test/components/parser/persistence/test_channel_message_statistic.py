@@ -51,6 +51,7 @@ async def test_message(
         channel_message_id=999,
         created_at=datetime.now(timezone.utc),
         text="Hello World!",
+        html_text="Hello World!",
     )
     await channel_message_dao.commit()
     return message

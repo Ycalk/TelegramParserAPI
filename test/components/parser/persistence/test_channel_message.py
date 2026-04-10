@@ -64,6 +64,7 @@ class TestChannelMessageCreateRead:
             channel_message_id=100,
             created_at=created_dt,
             text="First Test Message",
+            html_text="First Test Message",
         )
         await channel_message_dao.commit()
 
@@ -102,6 +103,7 @@ class TestChannelMessageConstraints:
             channel_message_id=200,
             created_at=created_dt,
             text="First duplicate",
+            html_text="First duplicate",
         )
         await channel_message_dao.commit()
 
@@ -112,6 +114,7 @@ class TestChannelMessageConstraints:
                 channel_message_id=200,
                 created_at=created_dt,
                 text="Second duplicate",
+                html_text="Second duplicate",
             )
 
 
@@ -131,6 +134,7 @@ class TestChannelMessageQueries:
                 channel_message_id=300 + i,
                 created_at=datetime(2025, 1, i + 1, tzinfo=timezone.utc),
                 text=f"Message {i}",
+                html_text=f"Message {i}",
             )
         await channel_message_dao.commit()
 
@@ -185,6 +189,7 @@ class TestChannelMessageRelationships:
             channel_message_id=500,
             created_at=datetime.now(timezone.utc),
             text="Message with relations",
+            html_text="Message with relations",
         )
         await message.awaitable_attrs.media_links
 

@@ -12,6 +12,7 @@ from parser.api.utils import CustomHTTPException, ErrorResponse
 from parser.dto import (
     Channel,
     ChannelMessage,
+    ChannelMessageWithHTMLText,
     ChannelStatistic,
     Media,
     MediaWithURL,
@@ -266,10 +267,14 @@ async def get_channel_messages(
 async def get_message(
     message_id: UUID,
     channel_message_dao: FromDishka[ChannelMessageDAO],
-) -> ChannelMessage:
+    with_html_text: bool = False,
+) -> ChannelMessage | ChannelMessageWithHTMLText:
     with tracer.start_as_current_span("api.get_message") as span:
         span.set_attribute("message.id", str(message_id))
-        request_logger = logger.bind(message_id=message_id)
+        span.set_attribute("with_html_text", with_html_text)
+        request_logger = logger.bind(
+            message_id=message_id, with_html_text=with_html_text
+        )
         request_logger.info("received_get_message_request", stage="start")
 
         message = await channel_message_dao.find_with_loaded_statistics_and_media(
@@ -284,7 +289,11 @@ async def get_message(
                 message=f"Message with id {message_id} not found",
             )
 
-        result = ChannelMessage.from_persistence(message)
+        result = (
+            ChannelMessageWithHTMLText.from_persistence(message)
+            if with_html_text
+            else ChannelMessage.from_persistence(message)
+        )
 
         request_logger.info("get_message_request_completed", stage="complete")
         return result

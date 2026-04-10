@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import override
 from uuid import UUID
 
 from parser.persistence import (
@@ -155,6 +156,21 @@ class ChannelMessage(BaseModel):
             ],
             recorded_at=int(message.recorded_at.timestamp()),
             updated_at=int(message.updated_at.timestamp()),
+        )
+
+
+class ChannelMessageWithHTMLText(ChannelMessage):
+    html_text: str
+
+    @staticmethod
+    @override
+    def from_persistence(
+        message: ChannelMessagePersistence,
+    ) -> ChannelMessageWithHTMLText:
+        channel_message = ChannelMessage.from_persistence(message)
+        return ChannelMessageWithHTMLText(
+            **channel_message.model_dump(),
+            html_text=message.html_text,
         )
 
 

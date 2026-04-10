@@ -2,6 +2,7 @@ from .core import (
     Channel,
     ChannelMessage,
     ChannelMessageStatistic,
+    ChannelMessageWithHTMLText,
     ChannelStatistic,
     Media,
     MediaWithURL,
@@ -20,4 +21,5 @@ __all__ = [
     "TelegramCredentials",
     "ProxySettings",
     "ParsingTask",
+    "ChannelMessageWithHTMLText",
 ]

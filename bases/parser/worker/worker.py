@@ -36,6 +36,7 @@ from parser.telegram import (
 from parser.telegram.settings import TelegramSettings
 from pydantic import HttpUrl, TypeAdapter
 from telethon import errors, functions, types
+from telethon.extensions import html
 from telethon.tl.types import Channel
 
 from .exceptions import TaskError, TaskExists, TemporaryCannotProcessTask
@@ -47,6 +48,7 @@ class _ParsedMessage:
     id: int
     views: int
     text: str
+    html_text: str
     created_at: datetime
     original_messages: list[types.Message]
 
@@ -691,7 +693,10 @@ class Worker:
                         id=message.id,
                         views=message.views or 0,
                         created_at=message_date,
-                        text=message.message or "",
+                        text=message.message,
+                        html_text=html.unparse(message.message, message.entities)
+                        if message.entities is not None
+                        else message.message,
                         original_messages=[message],
                     )
                     grouped_messages[group_key] = new_message
@@ -700,6 +705,11 @@ class Worker:
 
                     if message.message and not existing_message.text:
                         existing_message.text = message.message
+                        existing_message.html_text = (
+                            html.unparse(message.message, message.entities)
+                            if message.entities is not None
+                            else message.message
+                        )
                     if message.views and existing_message.views == 0:
                         existing_message.views = message.views
                     if message.id < existing_message.id:
@@ -747,13 +757,18 @@ class Worker:
                     )
                     if persistence_message is not None:
                         persistence_message.text = message.text
+                        persistence_message.html_text = message.html_text
                         await channel_message_dao.save(persistence_message)
                         await channel_message_statistic_dao.create(
                             persistence_message, message.views
                         )
                     else:
                         persistence_message = await channel_message_dao.create(
-                            channel, message.id, message.created_at, message.text
+                            channel,
+                            message.id,
+                            message.created_at,
+                            message.text,
+                            message.html_text,
                         )
                         await persistence_message.awaitable_attrs.media
                         for original_message in message.original_messages:

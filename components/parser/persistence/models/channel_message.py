@@ -31,6 +31,7 @@ class ChannelMessage(BaseModel):
     channel_message_id: Mapped[int] = mapped_column(BigInteger, index=True)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True))
     text: Mapped[str] = mapped_column(Text)
+    html_text: Mapped[str] = mapped_column(Text)
     channel_id: Mapped[int] = mapped_column(
         ForeignKey("channel.id", ondelete="CASCADE"), index=True
     )
@@ -62,12 +63,18 @@ class ChannelMessageDAO(BaseDAO[ChannelMessage, UUID]):
 
     @override
     async def create(
-        self, channel: Channel, channel_message_id: int, created_at: datetime, text: str
+        self,
+        channel: Channel,
+        channel_message_id: int,
+        created_at: datetime,
+        text: str,
+        html_text: str,
     ) -> ChannelMessage:
         new_message = ChannelMessage(
             channel_message_id=channel_message_id,
             created_at=created_at,
             text=text,
+            html_text=html_text,
             channel=channel,
         )
         await self.save(new_message)

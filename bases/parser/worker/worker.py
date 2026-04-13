@@ -756,8 +756,8 @@ class Worker:
                         )
                     )
                     if persistence_message is not None:
-                        persistence_message.text = message.text
-                        persistence_message.html_text = message.html_text
+                        persistence_message.text = message.text or ""
+                        persistence_message.html_text = message.html_text or ""
                         await channel_message_dao.save(persistence_message)
                         await channel_message_statistic_dao.create(
                             persistence_message, message.views
@@ -767,8 +767,8 @@ class Worker:
                             channel,
                             message.id,
                             message.created_at,
-                            message.text,
-                            message.html_text,
+                            message.text or "",
+                            message.html_text or "",
                         )
                         await persistence_message.awaitable_attrs.media
                         for original_message in message.original_messages:
